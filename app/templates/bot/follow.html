@@ -1,0 +1,236 @@
+<!-- app/templates/bot/follow.html -->
+{% extends 'base.html' %}
+
+{% block title %}Follow Bot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-user-plus text-info"></i> Follow Bot
+        </h1>
+        <p class="lead">Automatically follow Instagram users</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create Follow Task</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('bot.follow') }}">
+                    <ul class="nav nav-tabs mb-3" id="followTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="username-tab" data-bs-toggle="tab" data-bs-target="#username" type="button" role="tab" aria-controls="username" aria-selected="true">Follow User</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="hashtag-tab" data-bs-toggle="tab" data-bs-target="#hashtag" type="button" role="tab" aria-controls="hashtag" aria-selected="false">Follow by Hashtag</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="follower-tab" data-bs-toggle="tab" data-bs-target="#follower" type="button" role="tab" aria-controls="follower" aria-selected="false">Follow User's Followers</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="followTabContent">
+                        <!-- Follow User Tab -->
+                        <div class="tab-pane fade show active" id="username" role="tabpanel" aria-labelledby="username-tab">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username (without @):</label>
+                                <input type="text" class="form-control" id="username" name="username" placeholder="Enter username">
+                                <div class="form-text">Enter the Instagram username you want to follow</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Follow by Hashtag Tab -->
+                        <div class="tab-pane fade" id="hashtag" role="tabpanel" aria-labelledby="hashtag-tab">
+                            <div class="mb-3">
+                                <label for="hashtag" class="form-label">Hashtag (without #):</label>
+                                <input type="text" class="form-control" id="hashtag" name="hashtag" placeholder="Enter hashtag">
+                                <div class="form-text">Users who posted with this hashtag will be followed</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="user_count" class="form-label">Number of Users to Follow:</label>
+                                <input type="number" class="form-control" id="user_count" name="user_count" value="10" min="1" max="50">
+                            </div>
+                        </div>
+                        
+                        <!-- Follow User's Followers Tab -->
+                        <div class="tab-pane fade" id="follower" role="tabpanel" aria-labelledby="follower-tab">
+                            <div class="mb-3">
+                                <label for="target_username" class="form-label">Target Username (without @):</label>
+                                <input type="text" class="form-control" id="target_username" name="target_username" placeholder="Enter username">
+                                <div class="form-text">Enter the Instagram username whose followers you want to follow</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="follower_count" class="form-label">Number of Followers to Follow:</label>
+                                <input type="number" class="form-control" id="follower_count" name="follower_count" value="10" min="1" max="50">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Select Accounts -->
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Select Accounts:</label>
+                        <div class="card">
+                            <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                                <span>Available Accounts ({{ accounts|length }})</span>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllAccounts">Select All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllAccounts">Deselect All</button>
+                                </div>
+                            </div>
+                            <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                                {% if accounts %}
+                                    {% for account in accounts %}
+                                    <div class="form-check">
+                                        <input class="form-check-input account-checkbox" type="checkbox" name="accounts" value="{{ account.id }}" id="account{{ account.id }}">
+                                        <label class="form-check-label" for="account{{ account.id }}">
+                                            {{ account.username }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">No active accounts available. <a href="{{ url_for('accounts.create_account') }}">Create an account</a></p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Options -->
+                    <div class="mb-4">
+                        <p class="form-label">Advanced Options:</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="min_delay" class="form-label">Min Delay (seconds):</label>
+                                <input type="number" class="form-control" id="min_delay" name="min_delay" value="10" min="1">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="max_delay" class="form-label">Max Delay (seconds):</label>
+                                <input type="number" class="form-control" id="max_delay" name="max_delay" value="30" min="1">
+                            </div>
+                            
+                            <div class="col-12 mt-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="unfollow_later" name="unfollow_later" value="1">
+                                    <label class="form-check-label" for="unfollow_later">
+                                        Unfollow these users after a period
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6" id="unfollowDaysField" style="display: none;">
+                                <label for="unfollow_days" class="form-label">Unfollow After (days):</label>
+                                <input type="number" class="form-control" id="unfollow_days" name="unfollow_days" value="3" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-info" {% if not accounts %}disabled{% endif %}>
+                            <i class="fas fa-play"></i> Start Follow Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Tips Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Tips</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Follow users who match your niche</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Use longer delays to avoid blocks</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Don't exceed 100 follows per day per account</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Keep your follow/follower ratio balanced</li>
+                </ul>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Following/unfollowing too quickly can lead to temporary action blocks on Instagram.
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Tasks -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Tasks</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <!-- In a real app, these would be populated from your database -->
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">@influencer's followers</h6>
+                            <span class="badge bg-success">Completed</span>
+                        </div>
+                        <p class="mb-1 small">15 users followed</p>
+                        <small class="text-muted">Yesterday at 2:15 PM</small>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">#fitness</h6>
+                            <span class="badge bg-warning">Paused</span>
+                        </div>
+                        <p class="mb-1 small">8/20 users followed</p>
+                        <small class="text-muted">3 days ago</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Select/deselect all accounts
+    $('#selectAllAccounts').click(function() {
+        $('.account-checkbox').prop('checked', true);
+    });
+    
+    $('#deselectAllAccounts').click(function() {
+        $('.account-checkbox').prop('checked', false);
+    });
+    
+    // Tab handling for the form
+    $('#followTab button').on('click', function (e) {
+        e.preventDefault();
+        $(this).tab('show');
+    });
+    
+    // When changing tabs, clear the other tabs' inputs
+    $('#username-tab').on('shown.bs.tab', function (e) {
+        $('#hashtag').val('');
+        $('#target_username').val('');
+    });
+    
+    $('#hashtag-tab').on('shown.bs.tab', function (e) {
+        $('#username').val('');
+        $('#target_username').val('');
+    });
+    
+    $('#follower-tab').on('shown.bs.tab', function (e) {
+        $('#username').val('');
+        $('#hashtag').val('');
+    });
+    
+    // Show/hide unfollow days field based on checkbox
+    $('#unfollow_later').change(function() {
+        if(this.checked) {
+            $('#unfollowDaysField').show();
+        } else {
+            $('#unfollowDaysField').hide();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,557 @@
+<!-- app/templates/accounts/create.html -->
+{% extends 'base.html' %}
+
+{% block title %}Create Instagram Account{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .profile-pic-preview {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+    
+    .profile-pic-preview img {
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .char-count {
+        float: right;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    .status-area {
+        height: 200px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Create Instagram Account</h1>
+        <p class="lead">Fill out the form below to create a new Instagram account.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <form id="accountForm" method="POST" action="{{ url_for('accounts.create_account') }}" enctype="multipart/form-data">
+            <!-- Account Details Section -->
+            <div class="form-section">
+                <h3>Account Details</h3>
+                
+                <!-- Username field -->
+                <div class="mb-3 row">
+                    <label for="username" class="col-sm-3 col-form-label">Username:</label>
+                    <div class="col-sm-7">
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" id="checkUsername" class="btn btn-outline-primary btn-sm w-100">Check</button>
+                    </div>
+                    <div class="col-sm-9 offset-sm-3 mt-2">
+                        <button type="button" id="generateUsername" class="btn btn-outline-secondary btn-sm">Generate Username</button>
+                        <span id="usernameStatus" class="ms-3"></span>
+                    </div>
+                </div>
+                
+                <!-- Email field -->
+                <div class="mb-3 row">
+                    <label for="email" class="col-sm-3 col-form-label">Email:</label>
+                    <div class="col-sm-9">
+                        <div class="input-group">
+                            <input type="email" class="form-control" id="email" name="email">
+                            <div class="form-check form-switch ms-2 d-flex align-items-center">
+                                <input class="form-check-input" type="checkbox" id="temp_email" name="temp_email">
+                                <label class="form-check-label ms-2" for="temp_email">Use Temp Email</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Full Name field -->
+                <div class="mb-3 row">
+                    <label for="fullname" class="col-sm-3 col-form-label">Full Name:</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="fullname" name="fullname" required>
+                    </div>
+                </div>
+                
+                <!-- Password field -->
+                <div class="mb-3 row">
+                    <label for="password" class="col-sm-3 col-form-label">Password:</label>
+                    <div class="col-sm-7">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password">
+                            <button class="btn btn-outline-secondary" type="button" id="showPassword">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" id="generatePassword" class="btn btn-outline-secondary btn-sm w-100">Generate</button>
+                    </div>
+                </div>
+                
+                <!-- Phone field -->
+                <div class="mb-3 row">
+                    <label for="phone" class="col-sm-3 col-form-label">Phone (optional):</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="phone" name="phone">
+                    </div>
+                </div>
+                
+                <!-- Date of Birth fields -->
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label">Date of Birth:</label>
+                    <div class="col-sm-9">
+                        <div class="row">
+                            <div class="col-4">
+                                <select class="form-select" id="month" name="month">
+                                    <option value="">Month</option>
+                                    {% for i in range(1, 13) %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <select class="form-select" id="day" name="day">
+                                    <option value="">Day</option>
+                                    {% for i in range(1, 32) %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <select class="form-select" id="year" name="year">
+                                    <option value="">Year</option>
+                                    {% for i in range(1970, 2005) %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gender field -->
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label">Gender:</label>
+                    <div class="col-sm-9">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="gender" id="genderFemale" value="Female" checked>
+                            <label class="form-check-label" for="genderFemale">Female</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="gender" id="genderMale" value="Male">
+                            <label class="form-check-label" for="genderMale">Male</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="gender" id="genderCustom" value="Custom">
+                            <label class="form-check-label" for="genderCustom">Custom</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profile Settings Section -->
+            <div class="form-section">
+                <h3>Profile Settings</h3>
+                
+                <!-- Profile Picture field -->
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label">Profile Picture:</label>
+                    <div class="col-sm-3">
+                        <div class="profile-pic-preview" id="profilePicPreview">
+                            <i class="fas fa-user fa-3x text-secondary"></i>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <input type="file" class="form-control mb-2" id="profilePic" name="profile_pic" accept="image/*">
+                        <button type="button" id="generatePicture" class="btn btn-outline-secondary btn-sm">Generate Random Avatar</button>
+                    </div>
+                </div>
+                
+                <!-- Bio field -->
+                <div class="mb-3 row">
+                    <label for="bio" class="col-sm-3 col-form-label">Bio:</label>
+                    <div class="col-sm-9">
+                        <textarea class="form-control" id="bio" name="bio" rows="3" maxlength="150"></textarea>
+                        <div class="d-flex justify-content-between mt-2">
+                            <button type="button" id="generateBio" class="btn btn-outline-secondary btn-sm">Generate Bio</button>
+                            <span id="charCount" class="char-count">0/150</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Proxy Settings Section -->
+            <div class="form-section">
+                <h3>Proxy Settings</h3>
+                
+                <div class="mb-3 row">
+                    <div class="col-sm-9 offset-sm-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="use_proxy" name="use_proxy">
+                            <label class="form-check-label" for="use_proxy">
+                                Use Proxy
+                            </label>
+                            <small class="text-muted ms-2">Using proxies helps avoid IP blocks and increases success rates</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="proxyFields" style="display: none;">
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label">Proxy:</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="proxy_id" name="proxy_id">
+                                <option value="">Select a proxy</option>
+                                {% for proxy in proxies %}
+                                <option value="{{ proxy.id }}">{{ proxy.ip }}:{{ proxy.port }} ({{ proxy.protocol }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit Buttons -->
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-secondary" id="resetForm">Reset Form</button>
+                <button type="submit" class="btn btn-primary" id="createAccountBtn">Create Account</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Status Panel -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span id="statusText">Ready</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleLog">
+                            <i class="fas fa-chevron-down"></i> Show Log
+                        </button>
+                    </div>
+                    <div class="progress">
+                        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="status-area" id="logArea" style="display: none;">
+                    <div class="card bg-dark text-light">
+                        <div class="card-header py-1 d-flex justify-content-between align-items-center">
+                            <small>Log Output</small>
+                            <button type="button" class="btn btn-sm btn-outline-light" id="clearLog">Clear</button>
+                        </div>
+                        <div class="card-body p-2">
+                            <pre id="logText" class="mb-0" style="height: 240px; overflow-y: auto; font-size: 0.8rem;"></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Stats</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small>Success Rate:</small>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar bg-success" style="width: {{ stats.success_rate|default(0) }}%"></div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <small>Total Attempts: {{ stats.attempts|default(0) }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show/hide temporary email field
+    $('#temp_email').change(function() {
+        if ($(this).is(':checked')) {
+            $('#email').attr('disabled', true);
+            $('#email').val('');
+            logMessage('Will use temporary email for registration');
+        } else {
+            $('#email').attr('disabled', false);
+        }
+    });
+    
+    // Show/hide proxy fields
+    $('#use_proxy').change(function() {
+        if ($(this).is(':checked')) {
+            $('#proxyFields').slideDown();
+        } else {
+            $('#proxyFields').slideUp();
+        }
+    });
+    
+    // Toggle password visibility
+    $('#showPassword').click(function() {
+        var passwordField = $('#password');
+        var passwordType = passwordField.attr('type');
+        
+        if (passwordType === 'password') {
+            passwordField.attr('type', 'text');
+            $(this).html('<i class="fa fa-eye-slash"></i>');
+        } else {
+            passwordField.attr('type', 'password');
+            $(this).html('<i class="fa fa-eye"></i>');
+        }
+    });
+    
+    // Toggle log visibility
+    $('#toggleLog').click(function() {
+        $('#logArea').toggle();
+        
+        if ($('#logArea').is(':visible')) {
+            $(this).html('<i class="fas fa-chevron-up"></i> Hide Log');
+        } else {
+            $(this).html('<i class="fas fa-chevron-down"></i> Show Log');
+        }
+    });
+    
+    // Clear log
+    $('#clearLog').click(function() {
+        $('#logText').empty();
+    });
+    
+    // Reset form
+    $('#resetForm').click(function() {
+        $('#accountForm')[0].reset();
+        $('#profilePicPreview').html('<i class="fas fa-user fa-3x text-secondary"></i>');
+        $('#charCount').text('0/150');
+        $('#proxyFields').hide();
+        $('#email').attr('disabled', false);
+        $('#progressBar').css('width', '0%');
+        $('#statusText').text('Ready');
+        logMessage('Form reset');
+    });
+    
+    // Character counter for bio
+    $('#bio').on('input', function() {
+        var charCount = $(this).val().length;
+        $('#charCount').text(charCount + '/150');
+        
+        if (charCount > 150) {
+            $('#charCount').addClass('text-danger');
+        } else {
+            $('#charCount').removeClass('text-danger');
+        }
+    });
+    
+    // Profile picture preview
+    $('#profilePic').change(function(e) {
+        if (e.target.files && e.target.files[0]) {
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                $('#profilePicPreview').html('<img src="' + e.target.result + '">');
+            }
+            
+            reader.readAsDataURL(e.target.files[0]);
+            logMessage('Profile picture selected: ' + e.target.files[0].name);
+        }
+    });
+    
+    // Generate random username
+    $('#generateUsername').click(function() {
+        var fullname = $('#fullname').val().trim();
+        
+        if (!fullname) {
+            alert('Please enter a full name first');
+            return;
+        }
+        
+        $('#statusText').text('Generating username...');
+        logMessage('Generating username based on: ' + fullname);
+        
+        // Generate username based on fullname
+        var nameParts = fullname.toLowerCase().replace(/[^a-z0-9]/g, '').split(' ');
+        var firstName = nameParts[0] || '';
+        var randomNum = Math.floor(Math.random() * 9999) + 1;
+        var username = firstName + randomNum;
+        
+        $('#username').val(username);
+        $('#statusText').text('Username generated');
+        logMessage('Generated username: ' + username);
+    });
+    
+    // Check username availability
+    $('#checkUsername').click(function() {
+        var username = $('#username').val().trim();
+        
+        if (!username) {
+            alert('Please enter a username to check');
+            return;
+        }
+        
+        $('#statusText').text('Checking username availability...');
+        $('#usernameStatus').html('<i class="fas fa-spinner fa-spin"></i> Checking...');
+        logMessage('Checking availability for: ' + username);
+        
+        $.getJSON('/accounts/check-username?username=' + encodeURIComponent(username), function(data) {
+            if (data.available) {
+                $('#usernameStatus').html('<span class="text-success"><i class="fas fa-check-circle"></i> Available</span>');
+                logMessage('Username "' + username + '" is available');
+            } else {
+                $('#usernameStatus').html('<span class="text-danger"><i class="fas fa-times-circle"></i> Not available</span>');
+                logMessage('Username "' + username + '" is not available');
+            }
+            $('#statusText').text('Username availability check complete');
+        }).fail(function() {
+            $('#usernameStatus').html('<span class="text-danger"><i class="fas fa-exclamation-circle"></i> Error checking</span>');
+            logMessage('Error checking username availability');
+            $('#statusText').text('Ready');
+        });
+    });
+    
+    // Generate random password
+    $('#generatePassword').click(function() {
+        var length = 12;
+        var charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+        var password = "";
+        
+        for (var i = 0; i < length; i++) {
+            password += charset.charAt(Math.floor(Math.random() * charset.length));
+        }
+        
+        $('#password').val(password);
+        $('#password').attr('type', 'text');
+        $('#showPassword').html('<i class="fa fa-eye-slash"></i>');
+        
+        logMessage('Generated strong password');
+        setTimeout(function() {
+            $('#password').attr('type', 'password');
+            $('#showPassword').html('<i class="fa fa-eye"></i>');
+        }, 3000);
+    });
+    
+    // Generate random bio
+    $('#generateBio').click(function() {
+        // List of templates
+        var templates = [
+            "Hi, I'm {name}! {interest} enthusiast | {hobby} lover",
+            "{name} | {interest} | {hobby} | {location}",
+            "{interest} & {hobby} | {emoji} {name} {emoji}",
+            "Just a {adjective} person who loves {interest} and {hobby}",
+            "{emoji} {interest} | {hobby} | {name}"
+        ];
+        
+        // Random data
+        var interests = ["photography", "art", "travel", "music", "fashion", "food", "fitness", "nature", "tech", "books"];
+        var hobbies = ["hiking", "cooking", "reading", "dancing", "yoga", "running", "gaming", "painting", "writing", "surfing"];
+        var locations = ["NYC", "LA", "London", "Tokyo", "Paris", "Sydney", "Berlin", "Toronto", "Miami", "Barcelona"];
+        var adjectives = ["creative", "adventurous", "passionate", "curious", "happy", "inspired", "motivated", "positive", "friendly", "chill"];
+        var emojis = ["✨", "🌟", "🌈", "🌺", "🌹", "🌻", "🌞", "🌊", "🔥", "🦋", "🎵", "📷", "🎨", "✈️", "💫"];
+        
+        // Choose a template
+        var template = templates[Math.floor(Math.random() * templates.length)];
+        
+        // Use name if provided, otherwise "me"
+        var fullname = $('#fullname').val().trim();
+        var name = fullname.split(' ')[0] || "me";
+        
+        // Fill in the template
+        var interest = interests[Math.floor(Math.random() * interests.length)];
+        var hobby = hobbies[Math.floor(Math.random() * hobbies.length)];
+        var location = locations[Math.floor(Math.random() * locations.length)];
+        var adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        var emoji = emojis[Math.floor(Math.random() * emojis.length)];
+        
+        var bio = template
+            .replace('{name}', name)
+            .replace('{interest}', interest)
+            .replace('{hobby}', hobby)
+            .replace('{location}', location)
+            .replace('{adjective}', adjective)
+            .replace('{emoji}', emoji);
+        
+        $('#bio').val(bio);
+        $('#charCount').text(bio.length + '/150');
+        logMessage('Generated random bio');
+    });
+    
+    // Generate random profile picture (placeholder for now)
+    $('#generatePicture').click(function() {
+        // For now, we'll just show a placeholder
+        var randomId = Math.floor(Math.random() * 100);
+        var placeholderUrl = 'https://avatars.dicebear.com/api/initials/' + randomId + '.svg';
+        
+        $('#profilePicPreview').html('<img src="' + placeholderUrl + '">');
+        logMessage('Generated random profile picture');
+    });
+    
+    // Form submission handling
+    $('#accountForm').submit(function(e) {
+        // Only prevent default if we want to handle submission via AJAX
+        // e.preventDefault();
+        
+        $('#statusText').text('Starting account creation...');
+        $('#progressBar').css('width', '10%');
+        logMessage('Starting account creation process...');
+        
+        // For regular form submission, we'll just continue with the default behavior
+        // If you want to handle it with AJAX, uncomment the following:
+        /*
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: new FormData(this),
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                // Handle success
+            },
+            error: function(xhr) {
+                // Handle error
+            }
+        });
+        */
+    });
+    
+    // Function to add log messages
+    function logMessage(message) {
+        var now = new Date();
+        var timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                         now.getMinutes().toString().padStart(2, '0') + ':' + 
+                         now.getSeconds().toString().padStart(2, '0');
+        
+        $('#logText').append(timeString + ' - ' + message + '\n');
+        $('#logText').scrollTop($('#logText')[0].scrollHeight);
+    }
+    
+    // Initialize with a log message
+    $(document).ready(function() {
+        logMessage('Form initialized and ready');
+    });
+</script>
+{% endblock %}

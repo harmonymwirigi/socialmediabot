@@ -1,0 +1,108 @@
+<!-- app/templates/dashboard.html -->
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>Dashboard</h1>
+        <p class="lead">Welcome back, {{ current_user.username }}!</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Account Stats -->
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Instagram Accounts</h5>
+                <p class="display-4">{{ account_count }}</p>
+                <p class="text-muted">{{ active_accounts }} active</p>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('accounts.account_list') }}" class="btn btn-sm btn-primary">View Accounts</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Actions -->
+    <div class="col-md-9">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% if recent_tasks %}
+                        {% for task in recent_tasks %}
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ task.task_type|title }}</h6>
+                                <small>
+                                    {% if task.status == 'completed' %}
+                                    <span class="badge bg-success">Completed</span>
+                                    {% elif task.status == 'running' %}
+                                    <span class="badge bg-primary">Running</span>
+                                    {% elif task.status == 'failed' %}
+                                    <span class="badge bg-danger">Failed</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ task.status|title }}</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <p class="mb-1 small">{{ task.result or 'No result data' }}</p>
+                            <small class="text-muted">{{ task.start_time.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item">
+                            <p class="text-muted mb-0">No recent activity</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>Quick Actions</h2>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <i class="fas fa-user-plus text-primary mb-3" style="font-size: 2rem;"></i>
+                <h5>Create Account</h5>
+                <p class="text-muted">Create a new Instagram account with automated verification</p>
+                <a href="{{ url_for('accounts.create_account') }}" class="btn btn-outline-primary">Create Account</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <i class="fas fa-comment text-success mb-3" style="font-size: 2rem;"></i>
+                <h5>Comment Bot</h5>
+                <p class="text-muted">Post comments on Instagram posts automatically</p>
+                <a href="{{ url_for('bot.comment') }}" class="btn btn-outline-success">Start Bot</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <i class="fas fa-heart text-danger mb-3" style="font-size: 2rem;"></i>
+                <h5>Like Bot</h5>
+                <p class="text-muted">Automatically like posts on Instagram</p>
+                <a href="{{ url_for('bot.like') }}" class="btn btn-outline-danger">Start Bot</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

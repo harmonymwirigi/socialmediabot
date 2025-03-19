@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Manual Verification - {{ account.username }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('accounts.account_list') }}">Accounts</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('accounts.account_detail', account_id=account.id) }}">{{ account.username }}</a></li>
+            <li class="breadcrumb-item active">Manual Verification</li>
+        </ol>
+    </nav>
+Copy<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">Manual Verification for {{ account.username }}</h4>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5 class="alert-heading">Manual Login Process</h5>
+            <p>When you click "Begin Manual Login", a browser window will open to Instagram's login page where you can:</p>
+            <ol>
+                <li>Enter your Instagram username and password manually</li>
+                <li>Complete any verification steps required (2FA, SMS codes, captchas, etc.)</li>
+                <li>Once you are fully logged in, the system will automatically detect this and save your session</li>
+                <li>The browser window will close automatically after successful login</li>
+            </ol>
+            <p>The system will capture your authentication cookies after successful login to enable automated actions in the future.</p>
+        </div>
+
+        <div class="alert alert-warning">
+            <p><strong>Important Notes:</strong></p>
+            <ul>
+                <li>You must manually enter your credentials - the system will not pre-fill them</li>
+                <li>Do not close the browser window manually during the verification process</li>
+                <li>The process will timeout after 5 minutes if not completed</li>
+                <li>For security, your password is never stored in plain text</li>
+            </ul>
+        </div>
+
+        <form method="POST" action="{{ url_for('accounts.manual_verify_account', account_id=account.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">Begin Manual Login</button>
+                <a href="{{ url_for('accounts.account_detail', account_id=account.id) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+{% endblock %}

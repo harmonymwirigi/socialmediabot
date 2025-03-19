@@ -1,0 +1,78 @@
+<!-- app/templates/bot/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Bot Actions{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Instagram Bot Actions</h1>
+        <p class="lead">Select an action to automate</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-comment"></i> Comment Bot</h5>
+            </div>
+            <div class="card-body">
+                <p>Automatically post comments on Instagram posts using your accounts.</p>
+                <p>Features:</p>
+                <ul>
+                    <li>Multiple account support</li>
+                    <li>Custom comments</li>
+                    <li>Spintax support</li>
+                    <li>Random delays</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('bot.comment') }}" class="btn btn-primary w-100">Launch Comment Bot</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-heart"></i> Like Bot</h5>
+            </div>
+            <div class="card-body">
+                <p>Automatically like Instagram posts using your accounts.</p>
+                <p>Features:</p>
+                <ul>
+                    <li>Multiple account support</li>
+                    <li>Post URL or hashtag targeting</li>
+                    <li>Random delays</li>
+                    <li>Activity limits</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('bot.like') }}" class="btn btn-success w-100">Launch Like Bot</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-user-plus"></i> Follow Bot</h5>
+            </div>
+            <div class="card-body">
+                <p>Automatically follow Instagram users with your accounts.</p>
+                <p>Features:</p>
+                <ul>
+                    <li>Multiple account support</li>
+                    <li>User or hashtag targeting</li>
+                    <li>Follow/unfollow cycle</li>
+                    <li>Anti-detection measures</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('bot.follow') }}" class="btn btn-info w-100">Launch Follow Bot</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

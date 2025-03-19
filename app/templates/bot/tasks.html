@@ -1,0 +1,211 @@
+<!-- app/templates/bot/tasks.html -->
+{% extends 'base.html' %}
+
+{% block title %}Bot Tasks{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1><i class="fas fa-tasks text-primary"></i> Bot Tasks</h1>
+            <p class="lead">View and manage your automated tasks</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('bot.comment') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-comment"></i> New Comment Task
+                </a>
+                <a href="{{ url_for('bot.like') }}" class="btn btn-outline-success">
+                    <i class="fas fa-heart"></i> New Like Task
+                </a>
+                <a href="{{ url_for('bot.follow') }}" class="btn btn-outline-info">
+                    <i class="fas fa-user-plus"></i> New Follow Task
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Filters -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h5 class="mb-0">Task Filters</h5>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                        <i class="fas fa-filter"></i> Show Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="collapse" id="filterCollapse">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('bot.tasks') }}">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Task Type</label>
+                            <select class="form-select" name="type">
+                                <option value="">All Types</option>
+                                <option value="comment">Comment</option>
+                                <option value="like">Like</option>
+                                <option value="follow">Follow</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="running">Running</option>
+                                <option value="completed">Completed</option>
+                                <option value="failed">Failed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Date Range</label>
+                            <div class="input-group">
+                                <input type="date" class="form-control" name="start_date">
+                                <span class="input-group-text">to</span>
+                                <input type="date" class="form-control" name="end_date">
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tasks Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Your Tasks</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if tasks %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Created</th>
+                            <th>Accounts</th>
+                            <th>Actions</th>
+                            <th>Success Rate</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>{{ task.id }}</td>
+                            <td>
+                                {% if task.task_type == 'comment' %}
+                                <span class="badge bg-primary"><i class="fas fa-comment"></i> Comment</span>
+                                {% elif task.task_type == 'like' %}
+                                <span class="badge bg-success"><i class="fas fa-heart"></i> Like</span>
+                                {% elif task.task_type == 'follow' %}
+                                <span class="badge bg-info"><i class="fas fa-user-plus"></i> Follow</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ task.task_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ task.status|status_color }}">{{ task.status|title }}</span>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 8px; width: 100px;">
+                                    <div class="progress-bar bg-{{ task.status|status_color }}" role="progressbar" 
+                                         style="width: {{ task.progress }}%;" 
+                                         aria-valuenow="{{ task.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">{{ task.progress }}%</small>
+                            </td>
+                            <td>
+                                <span title="{{ task.created_at.strftime('%Y-%m-%d %H:%M:%S') }}">
+                                    {{ task.created_at.strftime('%b %d, %H:%M') }}
+                                </span>
+                            </td>
+                            <td>{{ task.account_count }}</td>
+                            <td>{{ task.action_count }}</td>
+                            <td>
+                                {% if task.success_rate > 0 %}
+                                <span class="{% if task.success_rate > 80 %}text-success{% elif task.success_rate > 50 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ task.success_rate|round(1) }}%
+                                </span>
+                                {% else %}
+                                --
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('bot.status', task_id=task.id) }}" class="btn btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if task.status == 'pending' %}
+                                    <button type="button" class="btn btn-outline-danger" 
+                                            onclick="cancelTask({{ task.id }})">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    <i class="fas fa-tasks fa-4x text-muted"></i>
+                </div>
+                <h5>No tasks found</h5>
+                <p class="text-muted">You haven't created any bot tasks yet.</p>
+                <a href="{{ url_for('bot.comment') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Your First Task
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Task Cancel Confirmation Modal -->
+<div class="modal fade" id="cancelTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to cancel this task? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <form id="cancelTaskForm" method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Cancel Task</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function cancelTask(taskId) {
+        const modal = new bootstrap.Modal(document.getElementById('cancelTaskModal'));
+        document.getElementById('cancelTaskForm').action = `/bot/cancel/${taskId}`;
+        modal.show();
+    }
+</script>
+{% endblock %}

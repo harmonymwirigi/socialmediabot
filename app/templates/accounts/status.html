@@ -1,0 +1,84 @@
+<!-- app/templates/accounts/status.html -->
+{% extends 'base.html' %}
+
+{% block title %}Account Verification Status{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Account Verification Status</h1>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>{{ account.username }}</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Status:</strong> 
+                {% if account.is_verified %}
+                <span class="badge bg-success">Verified</span>
+                {% else %}
+                <span class="badge bg-warning">Not Verified</span>
+                {% endif %}
+            </p>
+            
+            {% if task_status %}
+            <p><strong>Verification Task:</strong> 
+                <span class="badge bg-info">{{ task_status }}</span>
+            </p>
+            
+            {% if task_status == 'PENDING' %}
+            <div class="alert alert-info">
+                Verification task is waiting to be processed...
+            </div>
+            {% elif task_status == 'STARTED' %}
+            <div class="alert alert-info">
+                Verification is in progress...
+                <div class="progress mt-2">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+            
+            {% if account.is_verified %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> This account has been successfully verified and cookies saved.
+                {% if account.last_verified %}
+                <p class="mb-0"><small>Last verified: {{ account.last_verified.strftime('%Y-%m-%d %H:%M:%S') }}</small></p>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> This account hasn't been verified yet.
+                {% if not task_status or task_status == 'SUCCESS' or task_status == 'FAILURE' %}
+                <form method="POST" action="{{ url_for('accounts.verify_account', account_id=account.id) }}" class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary btn-sm">Verify Now</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            <a href="{{ url_for('accounts.account_list') }}" class="btn btn-secondary">Back to Account List</a>
+            {% if task_status == 'STARTED' or task_status == 'PENDING' %}
+            <button id="refresh-btn" class="btn btn-info">
+                <i class="fas fa-sync-alt"></i> Refresh Status
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if task_status == 'STARTED' or task_status == 'PENDING' %}
+<script>
+    // Auto-refresh page every 5 seconds
+    setTimeout(function() {
+        window.location.reload();
+    }, 5000);
+    
+    document.getElementById('refresh-btn').addEventListener('click', function() {
+        window.location.reload();
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,108 @@
+<!-- app/templates/accounts/add_existing.html -->
+{% extends 'base.html' %}
+
+{% block title %}Add Existing Account{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Add Existing Instagram Account</h1>
+        <p class="lead">Add an existing Instagram account to your automation system</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('accounts.account_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Accounts
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Account Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('accounts.add_existing') }}">
+                    <!-- CSRF Token if using Flask-WTF -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Instagram Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Instagram Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address (optional)</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                        <div class="form-text">The email associated with this Instagram account, if known</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="proxy" class="form-label">Proxy (optional)</label>
+                        <select class="form-select" id="proxy" name="proxy_id">
+                            <option value="">No Proxy</option>
+                            {% for proxy in proxies %}
+                            <option value="{{ proxy.id }}">{{ proxy.ip }}:{{ proxy.port }} ({{ proxy.protocol }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Assign a proxy to this account for better security</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="verify_now" name="verify_now" checked>
+                        <label class="form-check-label" for="verify_now">Verify account now</label>
+                        <div class="form-text">Attempt to login and verify the account credentials immediately</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Add Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Tips</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Make sure the account credentials are correct</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Use proxies to avoid Instagram detection</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> If verification fails, the account will be added but marked as inactive</li>
+                    <li class="mb-2"><i class="fas fa-exclamation-triangle text-warning me-2"></i> Instagram may require additional verification for added accounts</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Toggle password visibility
+    $('#togglePassword').click(function() {
+        const passwordField = $('#password');
+        const passwordType = passwordField.attr('type');
+        
+        if (passwordType === 'password') {
+            passwordField.attr('type', 'text');
+            $(this).html('<i class="fas fa-eye-slash"></i>');
+        } else {
+            passwordField.attr('type', 'password');
+            $(this).html('<i class="fas fa-eye"></i>');
+        }
+    });
+</script>
+{% endblock %}

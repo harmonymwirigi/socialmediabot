@@ -1,0 +1,137 @@
+<script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+<h1>Project architecture</h1>
+<pre class="mermaid">
+    flowchart TD
+    subgraph Frontend
+        UI[Admin Dashboard]
+        CF[Campaign Setup Form]
+    end
+
+    subgraph Backend
+        API[Flask API]
+        Auth[Authentication]
+        
+        subgraph Services
+            AS[Account Service]
+            IS[Interaction Service]
+            SS[Scraping Service]
+            CS[Campaign Service]
+        end
+        
+        subgraph Queue
+            CQ[(Celery + Redis)]
+        end
+        
+        subgraph Database
+            DB[(PostgreSQL/MySQL)]
+            subgraph Tables
+                UT[Users]
+                AT[Accounts]
+                CT[Campaigns]
+                LT[Logs]
+            end
+        end
+        
+        subgraph External
+            SM{Social Media Platforms}
+            CP{Captcha Services}
+            PX{Proxy Services}
+        end
+    end
+
+    %% Frontend to Backend connections
+    UI --> API
+    CF --> API
+    
+    %% API to Services
+    API --> Auth
+    API --> Services
+    
+    %% Services interactions
+    AS --> CQ
+    IS --> CQ
+    SS --> CQ
+    CS --> CQ
+    
+    %% Queue to External Services
+    CQ --> SM
+    CQ --> CP
+    CQ --> PX
+    
+    %% Database connections
+    Services --> DB
+    DB --> Tables
+    
+    %% Style definitions
+    classDef primary fill:#2196f3,stroke:#1976d2,stroke-width:2px,color:white
+    classDef secondary fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:white
+    classDef external fill:#ff9800,stroke:#f57c00,stroke-width:2px,color:white
+    
+    %% Apply styles
+    class UI,CF,API primary
+    class AS,IS,SS,CS,CQ,DB secondary
+    class SM,CP,PX external
+</pre>
+<h1>File structure</h1>
+<pre class="mermaid">
+    graph TD
+    root[social-media-bot]
+    
+    %% Main app directory
+    app[app/]
+    init[__init__.py<br/>Flask app initialization]
+    routes[routes.py<br/>API endpoints]
+    models[models.py<br/>Database models]
+    
+    %% Services subdirectory with platforms
+    services[services/]
+    
+    %% Platform specific directory
+    instagram[instagram/]
+    ig_scraping[scraping.py<br/>Instagram scraping logic]
+    ig_account[account.py<br/>Instagram account management]
+    ig_interaction[interaction.py<br/>Instagram interactions]
+    
+    %% Other root directories
+    templates[templates/<br/>HTML templates]
+    static[static/<br/>CSS, JS, images]
+    tests[tests/<br/>Unit and integration tests]
+    config[config.py<br/>Configuration settings]
+    requirements[requirements.txt<br/>Dependencies]
+    run[run.py<br/>Entry point]
+    
+    %% Connections
+    root --> app
+    root --> templates
+    root --> static
+    root --> tests
+    root --> config
+    root --> requirements
+    root --> run
+    
+    %% App directory connections
+    app --> init
+    app --> routes
+    app --> services
+    app --> models
+    
+    %% Services connections
+    services --> instagram
+    
+    %% Instagram connections
+    instagram --> ig_scraping
+    instagram --> ig_account
+    instagram --> ig_interaction
+    
+    %% Styling
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px
+    classDef directory fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef file fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef platform fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    
+    %% Apply styles
+    class root,app,services,templates,static,tests directory
+    class init,routes,models,config,requirements,run file
+    class instagram,ig_scraping,ig_account,ig_interaction platform
+</pre>
+<p>End of document.</p>

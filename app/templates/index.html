@@ -1,0 +1,154 @@
+<!-- app/templates/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Instagram Automation Tool{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+        color: white;
+        padding: 5rem 0;
+        border-radius: 10px;
+    }
+    
+    .feature-icon {
+        font-size: 3rem;
+        color: #fd1d1d;
+        margin-bottom: 1rem;
+    }
+    
+    .feature-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .cta-section {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero-section text-center mb-5">
+    <div class="container">
+        <h1 class="display-4 fw-bold mb-3">Instagram Automation Tool</h1>
+        <p class="lead mb-4">Manage multiple Instagram accounts, create new accounts, and automate interactions all in one place.</p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="{{ url_for('auth.login') }}" class="btn btn-light btn-lg px-4">Login</a>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-outline-light btn-lg px-4">Register</a>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="container mb-5">
+    <h2 class="text-center mb-5">Powerful Features</h2>
+    
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 border-0 feature-card">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h4>Account Creation</h4>
+                    <p class="text-muted">Easily create new Instagram accounts with automated verification handling and proxy support.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 border-0 feature-card">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-comment"></i>
+                    </div>
+                    <h4>Comment Bot</h4>
+                    <p class="text-muted">Automate comments on posts with multiple accounts, spintax support, and natural delays.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 border-0 feature-card">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <h4>Like & Follow</h4>
+                    <p class="text-muted">Automatically like posts and follow users with advanced targeting options.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- How It Works -->
+<div class="container mb-5">
+    <h2 class="text-center mb-5">How It Works</h2>
+    
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <img src="https://via.placeholder.com/600x400" alt="Dashboard Preview" class="img-fluid rounded-3 shadow">
+        </div>
+        <div class="col-md-6">
+            <div class="ps-md-4">
+                <h3 class="mb-3">Simple & Powerful</h3>
+                <p>Our Instagram Automation Tool provides a user-friendly interface for managing all your Instagram automation needs:</p>
+                
+                <div class="d-flex mb-2">
+                    <div class="me-3 text-primary">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
+                    <div>Create and manage multiple Instagram accounts</div>
+                </div>
+                
+                <div class="d-flex mb-2">
+                    <div class="me-3 text-primary">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
+                    <div>Automate comments, likes, and follows</div>
+                </div>
+                
+                <div class="d-flex mb-2">
+                    <div class="me-3 text-primary">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
+                    <div>Use proxy support for better security</div>
+                </div>
+                
+                <div class="d-flex mb-2">
+                    <div class="me-3 text-primary">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
+                    <div>Track performance with detailed analytics</div>
+                </div>
+                
+                <div class="mt-4">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Get Started</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Call to Action -->
+<div class="cta-section text-center mt-5 mb-5">
+    <div class="container">
+        <h2 class="mb-4">Ready to automate your Instagram presence?</h2>
+        <p class="lead mb-4">Join thousands of users who trust our tool for their Instagram automation needs.</p>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg px-4 me-md-2">Register Now</a>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary btn-lg px-4">Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
