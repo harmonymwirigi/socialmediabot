@@ -3,8 +3,26 @@ from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
- 
+from datetime import datetime
 
+class InstagramCookie(db.Model):
+    """Model for storing Instagram authentication cookies"""
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('instagram_account.id'), nullable=False)
+    cookie_name = db.Column(db.String(128), nullable=False)
+    cookie_value = db.Column(db.Text, nullable=False)
+    cookie_domain = db.Column(db.String(128), nullable=False)
+    cookie_path = db.Column(db.String(128), default='/')
+    secure = db.Column(db.Boolean, default=True)
+    expiry = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with InstagramAccount
+    account = db.relationship('InstagramAccount', backref=db.backref('cookies', lazy=True, cascade='all, delete-orphan'))
+    
+    def __repr__(self):
+        return f'<InstagramCookie {self.cookie_name} for {self.account.username}>'
 class User(UserMixin, db.Model):
     """User model for application login"""
     id = db.Column(db.Integer, primary_key=True)
@@ -49,8 +67,16 @@ class InstagramAccount(db.Model):
     comment_count = db.Column(db.Integer, default=0)
     action_count = db.Column(db.Integer, default=0)
     
+    # The cookies relationship is defined in the InstagramCookie model
+    
     def __repr__(self):
         return f'<InstagramAccount {self.username}>'
+    
+    def has_valid_cookies(self):
+        """Check if the account has valid essential cookies"""
+        essential_cookies = ['sessionid', 'ds_user_id', 'csrftoken']
+        existing_cookies = [cookie.cookie_name for cookie in self.cookies]
+        return all(cookie in existing_cookies for cookie in essential_cookies)
 
 
 class Proxy(db.Model):

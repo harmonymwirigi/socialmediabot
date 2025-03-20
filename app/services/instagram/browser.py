@@ -14,7 +14,7 @@ import random
 import logging
 import traceback
 import shutil  # <-- Agregado para cleanup de directorios si hace falta
-
+import datetime
 class InstagramBrowser:
     def __init__(self):
         self.base_url = "https://www.instagram.com"
@@ -71,66 +71,91 @@ class InstagramBrowser:
             self.logger.warning(f"Failed to cleanup temp directories: {str(e)}")
 
     def _check_cookies_exist(self, username):
-        """Check if cookies file exists for the user"""
-        cookie_path = self._get_cookie_path(username)
-        return os.path.exists(cookie_path)
+        """
+        Check if cookies exist in the database for a user
+        
+        Args:
+            username: Instagram username
+            
+        Returns:
+            bool: True if cookies exist, False otherwise
+        """
+        try:
+            # Import needed models
+            from app.models import InstagramAccount, InstagramCookie
+            
+            # Find the account in the database
+            account = InstagramAccount.query.filter_by(username=username).first()
+            if not account:
+                return False
+            
+            # Check for essential cookies
+            essential_cookies = ['sessionid', 'ds_user_id', 'csrftoken']
+            for cookie_name in essential_cookies:
+                cookie = InstagramCookie.query.filter_by(
+                    account_id=account.id, 
+                    cookie_name=cookie_name
+                ).first()
+                if not cookie:
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error checking cookies for {username}: {str(e)}")
+            return False
 
     def _load_cookies(self, driver, username):
-        """(No se elimina de tu código) Carga cookies 
-           - Nota: ahora usaremos la versión CDP, pero mantenemos este método por compatibilidad."""
+        """
+        Load cookies from database and add to driver
+        
+        Args:
+            driver: WebDriver instance
+            username: Instagram username
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
-            cookie_path = self._get_cookie_path(username)
-            if not os.path.exists(cookie_path):
+            # Import needed models
+            from app.models import InstagramAccount, InstagramCookie
+            
+            # Find the account in the database
+            account = InstagramAccount.query.filter_by(username=username).first()
+            if not account:
+                self.logger.error(f"Account {username} not found in database")
                 return False
-
-            # NOTA: Este método hacía driver.get("instagram.com") primero,
-            # pero ahora, con la inyección CDP (opción 3), evitaremos llamarlo así desde create_driver.
+            
+            # Get cookies from database
+            cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
+            if not cookies:
+                self.logger.warning(f"No cookies found for {username}")
+                return False
+            
+            # Ensure we're on a page where cookies can be set
             current_url = driver.current_url
             if "instagram.com" not in current_url:
                 driver.get("https://www.instagram.com")
                 time.sleep(2)
-
-            with open(cookie_path, 'rb') as f:
-                cookies = pickle.load(f)
-
-            if not cookies:
-                return False
-
+            
+            # Add cookies to driver
             success_count = 0
             for cookie in cookies:
                 try:
-                    if 'expiry' in cookie:
-                        del cookie['expiry']
-                    if 'expires' in cookie:
-                        del cookie['expires']
-                    if 'domain' in cookie:
-                        if not cookie['domain'].startswith('.'):
-                            cookie['domain'] = '.' + cookie['domain']
-                    else:
-                        cookie['domain'] = '.instagram.com'
-
-                    for k in ['sameSite', 'httpOnly', 'secure']:
-                        if k in cookie:
-                            del cookie[k]
-
                     clean_cookie = {
-                        'name': cookie['name'],
-                        'value': cookie['value'],
-                        'domain': cookie['domain']
+                        'name': cookie.cookie_name,
+                        'value': cookie.cookie_value,
+                        'domain': cookie.cookie_domain,
+                        'path': cookie.cookie_path
                     }
-                    if 'path' in cookie:
-                        clean_cookie['path'] = cookie['path']
-
                     driver.add_cookie(clean_cookie)
                     success_count += 1
-
                 except Exception as e:
-                    self.logger.warning(f"Failed to add cookie {cookie.get('name')}: {str(e)}")
-                    continue
-
+                    self.logger.warning(f"Failed to add cookie {cookie.cookie_name}: {str(e)}")
+            
             self.logger.info(f"Successfully loaded {success_count} cookies for {username}")
             return success_count > 0
-
+        
         except Exception as e:
             self.logger.error(f"Failed to load cookies for {username}: {str(e)}")
             return False
@@ -168,56 +193,94 @@ class InstagramBrowser:
             self.logger.warning(f"Failed to cleanup temp directories: {str(e)}")
 
     def _save_cookies(self, driver, username):
-        """Save all necessary authentication cookies"""
+        """
+        Save all necessary authentication cookies to the database
+        
+        Args:
+            driver: WebDriver instance
+            username: Instagram username
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
+            # Import needed models
+            from app import db
+            from app.models import InstagramAccount, InstagramCookie
+            
+            # Find the account in the database
+            account = InstagramAccount.query.filter_by(username=username).first()
+            if not account:
+                self.logger.error(f"Account {username} not found in database")
+                return False
+            
             all_cookies = driver.get_cookies()
             essential_cookies = [
                 'sessionid', 'ds_user_id', 'csrftoken', 'ig_did',
                 'mid', 'ig_nrcb', 'datr', 'rur', 'shbid', 'shbts'
             ]
-
-            cookies_to_save = []
+            
+            # Delete existing cookies for this account
+            InstagramCookie.query.filter_by(account_id=account.id).delete()
+            
+            # Store all cookies in the database
+            saved_count = 0
             for cookie in all_cookies:
-                if cookie['name'] in essential_cookies:
-                    clean_cookie = {
-                        'name': cookie['name'],
-                        'value': cookie['value'],
-                        'domain': '.instagram.com',
-                        'path': '/'
-                    }
-                    cookies_to_save.append(clean_cookie)
-                elif '.instagram.com' in cookie.get('domain', ''):
-                    clean_cookie = {
-                        'name': cookie['name'],
-                        'value': cookie['value'],
-                        'domain': '.instagram.com',
-                        'path': '/'
-                    }
-                    cookies_to_save.append(clean_cookie)
-
-            if not cookies_to_save:
-                raise Exception("No valid cookies found to save")
-
-            saved_cookie_names = {cookie['name'] for cookie in cookies_to_save}
+                # Normalize domain
+                domain = cookie.get('domain', '.instagram.com')
+                if not domain.startswith('.'):
+                    domain = '.' + domain
+                
+                # Convert expiry to datetime if present
+                expiry = None
+                if 'expiry' in cookie:
+                    try:
+                        expiry = datetime.datetime.fromtimestamp(cookie['expiry'])
+                    except:
+                        pass
+                    
+                # Create new cookie record
+                db_cookie = InstagramCookie(
+                    account_id=account.id,
+                    cookie_name=cookie['name'],
+                    cookie_value=cookie['value'],
+                    cookie_domain=domain,
+                    cookie_path=cookie.get('path', '/'),
+                    secure=cookie.get('secure', True),
+                    expiry=expiry
+                )
+                db.session.add(db_cookie)
+                saved_count += 1
+            
+            # Check if we saved all essential cookies
+            saved_cookie_names = [cookie['name'] for cookie in all_cookies]
             missing_essential = [
                 name for name in ['sessionid', 'ds_user_id', 'csrftoken']
                 if name not in saved_cookie_names
             ]
-
+            
             if missing_essential:
-                raise Exception(f"Missing essential cookies: {missing_essential}")
-
-            cookie_path = self._get_cookie_path(username)
-            with open(cookie_path, 'wb') as f:
-                pickle.dump(cookies_to_save, f)
-
-            self.logger.info(f"Successfully saved {len(cookies_to_save)} cookies for {username}")
+                self.logger.warning(f"Missing essential cookies for {username}: {missing_essential}")
+                db.session.rollback()
+                return False
+            
+            # Commit the transaction
+            db.session.commit()
+            
+            # Update account verification status
+            account.is_verified = True
+            account.verification_status = 'completed'
+            account.last_verified = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            self.logger.info(f"Successfully saved {saved_count} cookies for {username}")
             return True
-
+        
         except Exception as e:
             self.logger.error(f"Failed to save cookies for {username}: {str(e)}")
+            if 'db' in locals():
+                db.session.rollback()
             return False
-
     def login(self, username, password):
         """
         Login to Instagram with enhanced challenge detection
@@ -363,6 +426,7 @@ class InstagramBrowser:
         """
         Opens a browser window for manual login and waits for successful login completion.
         Does not attempt to enter credentials, allowing the user to complete the entire login process.
+        Saves cookies to database when login is successful.
         
         Args:
             username: Instagram username for cookie identification
@@ -445,7 +509,7 @@ class InstagramBrowser:
                             # Wait a moment to ensure all cookies are set
                             time.sleep(3)
                             
-                            # Save cookies
+                            # Save cookies to database
                             if self._save_cookies(driver, username):
                                 self.logger.info(f"Successfully saved cookies for {username}")
                                 
@@ -712,12 +776,33 @@ class InstagramBrowser:
             return False
 
     # -- NUEVO: método para inyectar cookies via CDP antes de cargar la página
-    def _inject_cookies_via_cdp(self, driver, cookies):
+    def _inject_cookies_via_cdp(self, driver, username):
         """
-        Uses Chrome DevTools Protocol to set cookies before visiting Instagram,
-        preventing the login screen from briefly appearing.
+        Uses Chrome DevTools Protocol to set cookies before visiting Instagram
+        
+        Args:
+            driver: WebDriver instance
+            username: Instagram username
+            
+        Returns:
+            bool: True if successful, False otherwise
         """
         try:
+            # Import needed models
+            from app.models import InstagramAccount, InstagramCookie
+            
+            # Find the account in the database
+            account = InstagramAccount.query.filter_by(username=username).first()
+            if not account:
+                self.logger.error(f"Account {username} not found in database")
+                return False
+            
+            # Get cookies from database
+            db_cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
+            if not db_cookies:
+                self.logger.warning(f"No cookies found for {username}")
+                return False
+            
             # Enable network control
             driver.execute_cdp_cmd("Network.enable", {})
             
@@ -725,38 +810,37 @@ class InstagramBrowser:
             self._set_anti_fingerprinting_params(driver)
             
             cdp_cookies = []
-
-            for c in cookies:
-                # Convert cookies to CDP format
-                domain = c.get('domain', '.instagram.com')
-                if not domain.startswith('.'):
-                    domain = '.' + domain
-
+            for cookie in db_cookies:
+                # Convert to CDP format
                 cdp_cookie = {
-                    "domain": domain,
-                    "path": c.get("path", "/"),
-                    "secure": True,
-                    "httpOnly": c.get("httpOnly", False),
-                    "name": c["name"],
-                    "value": c["value"],
-                    "sameSite": c.get("sameSite", "None")
+                    "domain": cookie.cookie_domain,
+                    "path": cookie.cookie_path,
+                    "secure": cookie.secure,
+                    "httpOnly": False,  # Default value
+                    "name": cookie.cookie_name,
+                    "value": cookie.cookie_value,
+                    "sameSite": "None"  # Default value
                 }
                 
                 # Add expiration if present
-                if 'expiry' in c:
-                    cdp_cookie['expires'] = c['expiry']
+                if cookie.expiry:
+                    cdp_cookie['expires'] = int(cookie.expiry.timestamp())
                     
                 cdp_cookies.append(cdp_cookie)
-
+            
             # Set cookies in bulk
             driver.execute_cdp_cmd("Network.setCookies", {"cookies": cdp_cookies})
-            self.logger.info(f"Injected {len(cdp_cookies)} cookies via CDP.")
+            self.logger.info(f"Injected {len(cdp_cookies)} cookies via CDP for {username}")
             
             # Apply additional anti-detection measures
             self._apply_stealth_cdp_commands(driver)
             
+            return True
+            
         except Exception as e:
             self.logger.error(f"Error injecting cookies via CDP: {str(e)}")
+            return False
+
 
     def _set_anti_fingerprinting_params(self, driver):
         """Sets various parameters to prevent browser fingerprinting"""
@@ -967,16 +1051,18 @@ class InstagramBrowser:
             
             driver.set_page_load_timeout(self.timeout)
             
-            # If username is provided, try to load cookies
+            # If username is provided, try to load cookies from database
             if username and not fresh_session:
-                cookie_path = self._get_cookie_path(username)
-                if os.path.exists(cookie_path):
+                if self._check_cookies_exist(username):
                     try:
+                        # Use CDP to inject cookies (most reliable method)
+                        self._inject_cookies_via_cdp(driver, username)
+                    except Exception as e:
+                        self.logger.error(f"Failed to inject cookies via CDP for {username}: {str(e)}")
+                        # Fallback to regular cookie loading
                         driver.get("https://www.instagram.com")
                         time.sleep(2)
                         self._load_cookies(driver, username)
-                    except Exception as e:
-                        self.logger.error(f"Failed to load cookies for {username}: {str(e)}")
                         
             return driver
             
