@@ -160,7 +160,6 @@ def add_existing():
         new_account = InstagramAccount(
             username=username,
             email=email,
-            password_encrypted=encrypted_password,
             full_name=username,  # Use username as fallback for full name
             is_active=True,
             is_verified=False,

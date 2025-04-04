@@ -1,67 +1,22 @@
 # social-media-bot/app/services/instagram/account.py
 
-from cryptography.fernet import Fernet
-import os
 import datetime
 import logging
-from app import db  # Import SQLAlchemy db
-from app.models import InstagramAccount  
-
+from app import db
+from app.models import InstagramAccount
 
 class InstagramAccountService:
     """Service for managing Instagram accounts using Flask-SQLAlchemy"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self._init_encryption()
     
-    def _init_encryption(self):
-        """Initialize encryption for secure password storage"""
+    def add_account(self, username, email=None, phone=None, creation_ip=None, user_id=None):
+        """Add an account to the database"""
         try:
-            # Create key if it doesn't exist
-            if not os.path.exists('secret.key'):
-                print("Creating new encryption key")
-                key = Fernet.generate_key()
-                with open('secret.key', 'wb') as key_file:
-                    key_file.write(key)
-            
-            # Read the key
-            with open('secret.key', 'rb') as key_file:
-                self.key = key_file.read()
-            
-            self.fernet = Fernet(self.key)
-            print("Encryption initialized successfully")
-        except Exception as e:
-            print(f"Error initializing encryption: {str(e)}")
-            raise
-
-
-    def decrypt_password(self, encrypted_password):
-        """Decrypt a password for use in automation"""
-        try:
-            # Handle string vs bytes
-            if isinstance(encrypted_password, str):
-                try:
-                    import base64
-                    encrypted_password = base64.b64decode(encrypted_password)
-                except:
-                    encrypted_password = encrypted_password.encode()
-            
-            decrypted = self.fernet.decrypt(encrypted_password)
-            return decrypted.decode()
-        except Exception as e:
-            print(f"Failed to decrypt password: {str(e)}")
-            raise
-    
-    def add_account(self, username, password, email=None, phone=None, creation_ip=None, user_id=None):
-        """Add an account to the database with encrypted password"""
-        try:
-            encrypted_password = self.fernet.encrypt(password.encode())
-            
             # Create a new InstagramAccount object
             account = InstagramAccount(
-                username=username, 
-                password_encrypted=encrypted_password,
+                username=username,
                 email=email,
                 phone=phone,
                 creation_ip=creation_ip,
@@ -107,7 +62,7 @@ class InstagramAccountService:
             self.logger.error(f"Failed to update account verification: {str(e)}")
             db.session.rollback()
             return False
-    
+        
     def get_accounts(self):
         """Get all accounts with basic info"""
         try:
@@ -135,8 +90,8 @@ class InstagramAccountService:
                 accounts = InstagramAccount.query.all()
                 print(f"DEBUG: Found {len(accounts)} total accounts")
             
-            # Convert to format expected by interaction service
-            return [(account.username, account.password_encrypted) for account in accounts]
+            # Convert to format expected by interaction service (only return username)
+            return [(account.username, None) for account in accounts]
             
         except Exception as e:
             print(f"DEBUG ERROR: Failed to get active accounts: {str(e)}")
@@ -155,20 +110,6 @@ class InstagramAccountService:
             self.logger.error(f"Failed to update last_used: {str(e)}")
             db.session.rollback()
             return False
-    
-    def change_password(self, username, new_password):
-        """Update an account's password"""
-        try:
-            account = InstagramAccount.query.filter_by(username=username).first()
-            if account:
-                account.password_encrypted = self.fernet.encrypt(new_password.encode())
-                db.session.commit()
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"Failed to change password for {username}: {str(e)}")
-            db.session.rollback()
-            raise
     
     def delete_account(self, username):
         """Remove an account from the database"""
@@ -191,66 +132,49 @@ class InstagramAccountService:
         except Exception as e:
             self.logger.error(f"Failed to get account count: {str(e)}")
             return 0
-
-    def decrypt_password(self, encrypted_password):
-        """Decrypt a password for use in automation"""
-        try:
-            # Handle string vs bytes
-            if isinstance(encrypted_password, str):
-                try:
-                    import base64
-                    encrypted_password = base64.b64decode(encrypted_password)
-                except:
-                    encrypted_password = encrypted_password.encode()
-            
-            decrypted = self.fernet.decrypt(encrypted_password)
-            return decrypted.decode()
-        except Exception as e:
-            print(f"Failed to decrypt password: {str(e)}")
-            raise
-    
-   
-    
-    
-   
     
     def get_accounts_with_details(self):
         """Get all accounts with detailed info"""
-        return self.db.fetch_all('''
-            SELECT username, is_active, last_used, email, phone, 
-                   verified, profile_completed, creation_date 
-            FROM accounts
-        ''')
-    
-   
+        try:
+            accounts = InstagramAccount.query.all()
+            return accounts
+        except Exception as e:
+            self.logger.error(f"Failed to get accounts with details: {str(e)}")
+            return []
     
     def get_account_details(self, username):
         """Get detailed information for a specific account"""
-        return self.db.fetch_one(
-            '''SELECT username, is_active, last_used, email, phone, 
-                    verified, profile_completed, creation_date, creation_ip
-               FROM accounts WHERE username = ?''',
-            (username,)
-        )
-    
-    
+        try:
+            account = InstagramAccount.query.filter_by(username=username).first()
+            return account
+        except Exception as e:
+            self.logger.error(f"Failed to get account details for {username}: {str(e)}")
+            return None
     
     def log_creation_attempt(self, username, email, success, error_message=None, 
                            ip_address=None, proxy_used=None, verification_required=False,
                            verification_type=None, captcha_required=False):
         """Log an account creation attempt"""
         try:
-            return self.db.log_creation_attempt(
-                username, email, success, error_message, ip_address, proxy_used,
-                verification_required, verification_type, captcha_required
-            )
+            # This would typically be implemented with a database model
+            self.logger.info(f"Account creation attempt: {username}, {email}, success: {success}")
+            return True
         except Exception as e:
             self.logger.error(f"Failed to log creation attempt: {str(e)}")
+            return False
     
     def get_creation_stats(self, days=30):
         """Get account creation statistics for the last N days"""
         try:
-            return self.db.get_creation_stats(days)
+            # This would typically be implemented with database queries
+            return {
+                'total_attempts': 0,
+                'successful': 0,
+                'verification_required': 0,
+                'verification_types': {},
+                'captcha_required': 0,
+                'error_types': {}
+            }
         except Exception as e:
             self.logger.error(f"Failed to get creation stats: {str(e)}")
             return {
@@ -261,9 +185,3 @@ class InstagramAccountService:
                 'captcha_required': 0,
                 'error_types': {}
             }
-    
-    
-    
-    
-   
-   

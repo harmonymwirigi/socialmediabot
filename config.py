@@ -14,5 +14,6 @@ class Config:
     MYSQL_DB = os.getenv('MYSQL_DB')
     
     # SQLAlchemy Config using mysql-connector
-    SQLALCHEMY_DATABASE_URI = f"mysql+mysqlconnector://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{MYSQL_DB}"
+    # Database configuration
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://tonirodriguez:Password1234@127.0.0.1:13306/tonirodriguez$socialmediabot'
     SQLALCHEMY_TRACK_MODIFICATIONS = False

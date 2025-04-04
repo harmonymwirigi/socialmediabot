@@ -10,6 +10,8 @@ def setup_task_logging(task_id):
     logger = logging.getLogger(f'bot_task_{task_id}')
     logger.setLevel(logging.INFO)
     return logger
+
+
 @celery.task(bind=True, name='app.tasks.bot_tasks.comment_on_post_task')
 def comment_on_post_task(self, task_id, post_url, comments, account_ids=None, user_id=None):
     """
@@ -39,15 +41,15 @@ def comment_on_post_task(self, task_id, post_url, comments, account_ids=None, us
         account_service = InstagramAccountService()
         
         if account_ids:
-            # Get specific accounts
+            # Get specific accounts (just usernames)
             accounts = []
             for account_id in account_ids:
                 account = InstagramAccount.query.get(account_id)
                 if account and account.is_active:
-                    accounts.append((account.username, account.password_encrypted))
+                    accounts.append(account.username)
         else:
-            # Use all active accounts
-            accounts = account_service.get_active_accounts()
+            # Use all active accounts (just usernames)
+            accounts = [username for username, _ in account_service.get_active_accounts()]
         
         if not accounts:
             logger.error("No active accounts found")

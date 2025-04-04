@@ -70,6 +70,7 @@ class InstagramBrowser:
         except Exception as e:
             self.logger.warning(f"Failed to cleanup temp directories: {str(e)}")
 
+    
     def _check_cookies_exist(self, username):
         """
         Check if cookies exist in the database for a user
@@ -81,26 +82,46 @@ class InstagramBrowser:
             bool: True if cookies exist, False otherwise
         """
         try:
-            # Import needed models
+            # Import needed modules
+            from flask import current_app
+            from app import create_app, db
             from app.models import InstagramAccount, InstagramCookie
             
-            # Find the account in the database
-            account = InstagramAccount.query.filter_by(username=username).first()
-            if not account:
-                return False
+            # Check if we're in an app context, if not create one
+            app_context = None
+            if not current_app:
+                app = create_app()
+                app_context = app.app_context()
+                app_context.push()
             
-            # Check for essential cookies
-            essential_cookies = ['sessionid', 'ds_user_id', 'csrftoken']
-            for cookie_name in essential_cookies:
-                cookie = InstagramCookie.query.filter_by(
-                    account_id=account.id, 
-                    cookie_name=cookie_name
-                ).first()
-                if not cookie:
+            try:
+                # Find the account in the database
+                account = InstagramAccount.query.filter_by(username=username).first()
+                if not account:
+                    self.logger.warning(f"Account {username} not found in database")
                     return False
-            
-            return True
-            
+                
+                # Check for essential cookies
+                essential_cookies = ['sessionid', 'ds_user_id', 'csrftoken']
+                cookie_count = 0
+                
+                for cookie_name in essential_cookies:
+                    cookie = InstagramCookie.query.filter_by(
+                        account_id=account.id, 
+                        cookie_name=cookie_name
+                    ).first()
+                    if cookie:
+                        cookie_count += 1
+                
+                has_cookies = cookie_count == len(essential_cookies)
+                self.logger.info(f"Cookies check for {username}: {has_cookies} ({cookie_count}/{len(essential_cookies)} essential cookies found)")
+                return has_cookies
+                
+            finally:
+                # Clean up the app context if we created one
+                if app_context:
+                    app_context.pop()
+                    
         except Exception as e:
             self.logger.error(f"Error checking cookies for {username}: {str(e)}")
             return False
@@ -117,45 +138,60 @@ class InstagramBrowser:
             bool: True if successful, False otherwise
         """
         try:
-            # Import needed models
+            # Import needed modules
+            from flask import current_app
+            from app import create_app, db
             from app.models import InstagramAccount, InstagramCookie
             
-            # Find the account in the database
-            account = InstagramAccount.query.filter_by(username=username).first()
-            if not account:
-                self.logger.error(f"Account {username} not found in database")
-                return False
+            # Check if we're in an app context, if not create one
+            app_context = None
+            if not current_app:
+                app = create_app()
+                app_context = app.app_context()
+                app_context.push()
             
-            # Get cookies from database
-            cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
-            if not cookies:
-                self.logger.warning(f"No cookies found for {username}")
-                return False
+            try:
+                # Find the account in the database
+                account = InstagramAccount.query.filter_by(username=username).first()
+                if not account:
+                    self.logger.error(f"Account {username} not found in database")
+                    return False
+                
+                # Get cookies from database
+                cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
+                if not cookies:
+                    self.logger.warning(f"No cookies found for {username}")
+                    return False
+                
+                # Ensure we're on a page where cookies can be set
+                current_url = driver.current_url
+                if "instagram.com" not in current_url:
+                    driver.get("https://www.instagram.com")
+                    time.sleep(2)
+                
+                # Add cookies to driver
+                success_count = 0
+                for cookie in cookies:
+                    try:
+                        clean_cookie = {
+                            'name': cookie.cookie_name,
+                            'value': cookie.cookie_value,
+                            'domain': cookie.cookie_domain,
+                            'path': cookie.cookie_path
+                        }
+                        driver.add_cookie(clean_cookie)
+                        success_count += 1
+                    except Exception as e:
+                        self.logger.warning(f"Failed to add cookie {cookie.cookie_name}: {str(e)}")
+                
+                self.logger.info(f"Successfully loaded {success_count} cookies for {username}")
+                return success_count > 0
             
-            # Ensure we're on a page where cookies can be set
-            current_url = driver.current_url
-            if "instagram.com" not in current_url:
-                driver.get("https://www.instagram.com")
-                time.sleep(2)
-            
-            # Add cookies to driver
-            success_count = 0
-            for cookie in cookies:
-                try:
-                    clean_cookie = {
-                        'name': cookie.cookie_name,
-                        'value': cookie.cookie_value,
-                        'domain': cookie.cookie_domain,
-                        'path': cookie.cookie_path
-                    }
-                    driver.add_cookie(clean_cookie)
-                    success_count += 1
-                except Exception as e:
-                    self.logger.warning(f"Failed to add cookie {cookie.cookie_name}: {str(e)}")
-            
-            self.logger.info(f"Successfully loaded {success_count} cookies for {username}")
-            return success_count > 0
-        
+            finally:
+                # Clean up the app context if we created one
+                if app_context:
+                    app_context.pop()
+                    
         except Exception as e:
             self.logger.error(f"Failed to load cookies for {username}: {str(e)}")
             return False
@@ -204,82 +240,96 @@ class InstagramBrowser:
             bool: True if successful, False otherwise
         """
         try:
-            # Import needed models
-            from app import db
+            # Import needed modules
+            from flask import current_app
+            from app import create_app, db
             from app.models import InstagramAccount, InstagramCookie
             
-            # Find the account in the database
-            account = InstagramAccount.query.filter_by(username=username).first()
-            if not account:
-                self.logger.error(f"Account {username} not found in database")
-                return False
+            # Check if we're in an app context, if not create one
+            app_context = None
+            if not current_app:
+                app = create_app()
+                app_context = app.app_context()
+                app_context.push()
             
-            all_cookies = driver.get_cookies()
-            essential_cookies = [
-                'sessionid', 'ds_user_id', 'csrftoken', 'ig_did',
-                'mid', 'ig_nrcb', 'datr', 'rur', 'shbid', 'shbts'
-            ]
-            
-            # Delete existing cookies for this account
-            InstagramCookie.query.filter_by(account_id=account.id).delete()
-            
-            # Store all cookies in the database
-            saved_count = 0
-            for cookie in all_cookies:
-                # Normalize domain
-                domain = cookie.get('domain', '.instagram.com')
-                if not domain.startswith('.'):
-                    domain = '.' + domain
+            try:
+                # Find the account in the database
+                account = InstagramAccount.query.filter_by(username=username).first()
+                if not account:
+                    self.logger.error(f"Account {username} not found in database")
+                    return False
                 
-                # Convert expiry to datetime if present
-                expiry = None
-                if 'expiry' in cookie:
-                    try:
-                        expiry = datetime.datetime.fromtimestamp(cookie['expiry'])
-                    except:
-                        pass
+                all_cookies = driver.get_cookies()
+                essential_cookies = [
+                    'sessionid', 'ds_user_id', 'csrftoken', 'ig_did',
+                    'mid', 'ig_nrcb', 'datr', 'rur', 'shbid', 'shbts'
+                ]
+                
+                # Delete existing cookies for this account
+                InstagramCookie.query.filter_by(account_id=account.id).delete()
+                
+                # Store all cookies in the database
+                saved_count = 0
+                for cookie in all_cookies:
+                    # Normalize domain
+                    domain = cookie.get('domain', '.instagram.com')
+                    if not domain.startswith('.'):
+                        domain = '.' + domain
                     
-                # Create new cookie record
-                db_cookie = InstagramCookie(
-                    account_id=account.id,
-                    cookie_name=cookie['name'],
-                    cookie_value=cookie['value'],
-                    cookie_domain=domain,
-                    cookie_path=cookie.get('path', '/'),
-                    secure=cookie.get('secure', True),
-                    expiry=expiry
-                )
-                db.session.add(db_cookie)
-                saved_count += 1
-            
-            # Check if we saved all essential cookies
-            saved_cookie_names = [cookie['name'] for cookie in all_cookies]
-            missing_essential = [
-                name for name in ['sessionid', 'ds_user_id', 'csrftoken']
-                if name not in saved_cookie_names
-            ]
-            
-            if missing_essential:
-                self.logger.warning(f"Missing essential cookies for {username}: {missing_essential}")
-                db.session.rollback()
-                return False
-            
-            # Commit the transaction
-            db.session.commit()
-            
-            # Update account verification status
-            account.is_verified = True
-            account.verification_status = 'completed'
-            account.last_verified = datetime.datetime.utcnow()
-            db.session.commit()
-            
-            self.logger.info(f"Successfully saved {saved_count} cookies for {username}")
-            return True
-        
+                    # Convert expiry to datetime if present
+                    expiry = None
+                    if 'expiry' in cookie:
+                        try:
+                            expiry = datetime.datetime.fromtimestamp(cookie['expiry'])
+                        except:
+                            pass
+                        
+                    # Create new cookie record
+                    db_cookie = InstagramCookie(
+                        account_id=account.id,
+                        cookie_name=cookie['name'],
+                        cookie_value=cookie['value'],
+                        cookie_domain=domain,
+                        cookie_path=cookie.get('path', '/'),
+                        secure=cookie.get('secure', True),
+                        expiry=expiry
+                    )
+                    db.session.add(db_cookie)
+                    saved_count += 1
+                
+                # Check if we saved all essential cookies
+                saved_cookie_names = [cookie['name'] for cookie in all_cookies]
+                missing_essential = [
+                    name for name in ['sessionid', 'ds_user_id', 'csrftoken']
+                    if name not in saved_cookie_names
+                ]
+                
+                if missing_essential:
+                    self.logger.warning(f"Missing essential cookies for {username}: {missing_essential}")
+                    db.session.rollback()
+                    return False
+                
+                # Commit the transaction
+                db.session.commit()
+                
+                # Update account verification status
+                account.is_verified = True
+                account.verification_status = 'completed'
+                account.last_verified = datetime.datetime.utcnow()
+                db.session.commit()
+                
+                self.logger.info(f"Successfully saved {saved_count} cookies for {username}")
+                return True
+                
+            finally:
+                # Clean up the app context if we created one
+                if app_context:
+                    app_context.pop()
+                    
         except Exception as e:
             self.logger.error(f"Failed to save cookies for {username}: {str(e)}")
-            if 'db' in locals():
-                db.session.rollback()
+            if app_context:
+                app_context.pop()
             return False
     def login(self, username, password):
         """
@@ -776,6 +826,7 @@ class InstagramBrowser:
             return False
 
     # -- NUEVO: método para inyectar cookies via CDP antes de cargar la página
+    
     def _inject_cookies_via_cdp(self, driver, username):
         """
         Uses Chrome DevTools Protocol to set cookies before visiting Instagram
@@ -788,55 +839,70 @@ class InstagramBrowser:
             bool: True if successful, False otherwise
         """
         try:
-            # Import needed models
+            # Import needed modules
+            from flask import current_app
+            from app import create_app, db
             from app.models import InstagramAccount, InstagramCookie
             
-            # Find the account in the database
-            account = InstagramAccount.query.filter_by(username=username).first()
-            if not account:
-                self.logger.error(f"Account {username} not found in database")
-                return False
+            # Check if we're in an app context, if not create one
+            app_context = None
+            if not current_app:
+                app = create_app()
+                app_context = app.app_context()
+                app_context.push()
             
-            # Get cookies from database
-            db_cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
-            if not db_cookies:
-                self.logger.warning(f"No cookies found for {username}")
-                return False
-            
-            # Enable network control
-            driver.execute_cdp_cmd("Network.enable", {})
-            
-            # Set initial fingerprint evasion parameters
-            self._set_anti_fingerprinting_params(driver)
-            
-            cdp_cookies = []
-            for cookie in db_cookies:
-                # Convert to CDP format
-                cdp_cookie = {
-                    "domain": cookie.cookie_domain,
-                    "path": cookie.cookie_path,
-                    "secure": cookie.secure,
-                    "httpOnly": False,  # Default value
-                    "name": cookie.cookie_name,
-                    "value": cookie.cookie_value,
-                    "sameSite": "None"  # Default value
-                }
+            try:
+                # Find the account in the database
+                account = InstagramAccount.query.filter_by(username=username).first()
+                if not account:
+                    self.logger.error(f"Account {username} not found in database")
+                    return False
                 
-                # Add expiration if present
-                if cookie.expiry:
-                    cdp_cookie['expires'] = int(cookie.expiry.timestamp())
+                # Get cookies from database
+                db_cookies = InstagramCookie.query.filter_by(account_id=account.id).all()
+                if not db_cookies:
+                    self.logger.warning(f"No cookies found for {username}")
+                    return False
+                
+                # Enable network control
+                driver.execute_cdp_cmd("Network.enable", {})
+                
+                # Set initial fingerprint evasion parameters
+                self._set_anti_fingerprinting_params(driver)
+                
+                cdp_cookies = []
+                for cookie in db_cookies:
+                    # Convert to CDP format
+                    cdp_cookie = {
+                        "domain": cookie.cookie_domain,
+                        "path": cookie.cookie_path,
+                        "secure": cookie.secure,
+                        "httpOnly": False,  # Default value
+                        "name": cookie.cookie_name,
+                        "value": cookie.cookie_value,
+                        "sameSite": "None"  # Default value
+                    }
                     
-                cdp_cookies.append(cdp_cookie)
+                    # Add expiration if present
+                    if cookie.expiry:
+                        cdp_cookie['expires'] = int(cookie.expiry.timestamp())
+                        
+                    cdp_cookies.append(cdp_cookie)
+                
+                # Set cookies in bulk
+                driver.execute_cdp_cmd("Network.setCookies", {"cookies": cdp_cookies})
+                self.logger.info(f"Injected {len(cdp_cookies)} cookies via CDP for {username}")
+                
+                # Apply additional anti-detection measures
+                self._apply_stealth_cdp_commands(driver)
+                
+                return True
             
-            # Set cookies in bulk
-            driver.execute_cdp_cmd("Network.setCookies", {"cookies": cdp_cookies})
-            self.logger.info(f"Injected {len(cdp_cookies)} cookies via CDP for {username}")
-            
-            # Apply additional anti-detection measures
-            self._apply_stealth_cdp_commands(driver)
-            
-            return True
-            
+            finally:
+                # Clean up the app context if we created one
+                if app_context:
+                    app_context.pop()
+                    
         except Exception as e:
             self.logger.error(f"Error injecting cookies via CDP: {str(e)}")
             return False

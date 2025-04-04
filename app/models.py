@@ -52,7 +52,7 @@ class InstagramAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120))
-    password_encrypted = db.Column(db.Text, nullable=False)
+    # Remove password_encrypted field
     full_name = db.Column(db.String(100))
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)

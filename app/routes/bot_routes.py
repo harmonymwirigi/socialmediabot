@@ -125,24 +125,63 @@ def like():
     accounts = InstagramAccount.query.filter_by(user_id=current_user.id, is_active=True).all()
     return render_template('bot/like.html', accounts=accounts)
 
+
 @bot_bp.route('/follow', methods=['GET', 'POST'])
 @login_required
 def follow():
-    """Follow bot interface"""
+    """Follow Instagram profiles"""
+    # Get all active accounts for the form
+    accounts = InstagramAccount.query.filter_by(is_active=True).all()
+    
     if request.method == 'POST':
-        username = request.form.get('username')
-        selected_accounts = request.form.getlist('accounts')
+        # Get form data
+        profile_url = request.form.get('profile_url', '').strip()
+        num_accounts = int(request.form.get('num_accounts', 1))
+        account_ids = request.form.getlist('accounts')
+        min_delay = int(request.form.get('min_delay', 5))
+        max_delay = int(request.form.get('max_delay', 10))
         
-        if not username or not selected_accounts:
-            flash('Please fill in all required fields', 'danger')
+        # Validate input
+        if not profile_url:
+            flash('Please enter a profile URL', 'danger')
             return redirect(url_for('bot.follow'))
         
-        # Create a task for following
-        flash('Follow task created!', 'success')
-        return redirect(url_for('bot.follow'))
+        # Clean up URL if needed
+        if not profile_url.startswith(('http://', 'https://')):
+            profile_url = 'https://www.instagram.com/' + profile_url.lstrip('@')
+            if not profile_url.endswith('/'):
+                profile_url += '/'
+        
+        # Ensure we have accounts selected
+        if not account_ids:
+            flash('Please select at least one account', 'danger')
+            return redirect(url_for('bot.follow'))
+        
+        # Create task record
+        task = BotTask(
+            user_id=current_user.id,
+            task_type='follow',
+            status='pending',
+            target_url=profile_url,
+            account_count=len(account_ids),
+            action_count=0
+        )
+        db.session.add(task)
+        db.session.commit()
+        
+        # Start background task
+        from app.utils.task_processor import process_follow_task
+        process_follow_task(
+            task_id=task.id,
+            profile_url=profile_url,
+            num_accounts=num_accounts,
+            account_ids=account_ids,
+            user_id=current_user.id
+        )
+        
+        flash('Follow task has been started', 'success')
+        return redirect(url_for('main.dashboard'))
     
-    # GET request - show the form
-    accounts = InstagramAccount.query.filter_by(user_id=current_user.id, is_active=True).all()
     return render_template('bot/follow.html', accounts=accounts)
 
 @bot_bp.route('/status/<int:task_id>')

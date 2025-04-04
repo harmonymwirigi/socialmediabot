@@ -7,7 +7,9 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
     
     # Database settings
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI', 'sqlite:///app.db')
+    # Local development with SSH tunnel
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://g304975_g304975:(SOilf%n_K(a@host.cpse32.eu:3306/g304975_social-media'
+    # SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI', 'sqlite:///app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Celery settings for background tasks
