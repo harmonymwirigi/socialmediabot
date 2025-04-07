@@ -75,11 +75,14 @@ class FixedInstagramInteractionService:
         except Exception as e:
             self.logger.warning(f"Failed to cleanup ChromeDriver: {str(e)}")
 
-    def _create_browser_instance(self):
+    def _create_browser_instance(self, username=None):
         """Create a new browser instance with proper cleanup"""
         with self.driver_lock:
             self._cleanup_chrome_driver()
-            return InstagramBrowser()
+            browser = InstagramBrowser()
+            if username:
+                browser.username = username  # Add this to track which username each browser is for
+            return browser
 
     
     def _comment_with_account(self, post_url: str, comments: List[str], 
@@ -249,7 +252,7 @@ class FixedInstagramInteractionService:
             
             # Setup threading for parallel processing
             progress_queue = queue.Queue()
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(selected_accounts), 2)) as executor:
                 future_to_account = {}
                 
                 # Submit tasks for each account
@@ -292,6 +295,7 @@ class FixedInstagramInteractionService:
             raise
 
     
+    
     def _follow_with_account(self, profile_url: str, username: str, progress_queue: queue.Queue) -> dict:
         """Handle following a profile with a single account
         
@@ -311,12 +315,10 @@ class FixedInstagramInteractionService:
         }
         
         driver = None
-        browser = None
         
         try:
             # Create browser instance
             self.logger.info(f"Creating browser instance for {username}")
-            browser = self._create_browser_instance()
             
             # First try using stored cookies
             self.logger.info(f"Attempting to create session with cookies for {username}")
@@ -325,8 +327,12 @@ class FixedInstagramInteractionService:
             manual_login_needed = False
             
             try:
+                # Create a direct instance instead of using _create_browser_instance
+                browser = InstagramBrowser()
+                
                 # Check if cookies exist and create a session
                 has_cookies = browser._check_cookies_exist(username)
+                self.logger.info(f"Cookie check result for {username}: {has_cookies}")
                 
                 if has_cookies:
                     self.logger.info(f"Found cookies for {username}, creating cookie-based session")
@@ -363,6 +369,9 @@ class FixedInstagramInteractionService:
                 # Inform the user they need to manually log in
                 print(f"⚠️ Manual login required for account {username}")
                 print("Please login to the Instagram account when the browser opens")
+                
+                # Create a fresh browser for manual login
+                browser = InstagramBrowser()
                 
                 # Start manual login process
                 manual_login_success = browser.initiate_manual_login(username)
@@ -410,6 +419,10 @@ class FixedInstagramInteractionService:
                 self.logger.warning(f"Failed to follow profile using {username}")
                 result['error'] = "Could not find or click follow button"
             
+        except Exception as e:
+            self.logger.error(f"Error while following with {username}: {str(e)}")
+            result['error'] = str(e)
+            
         finally:
             if driver:
                 try:
@@ -419,7 +432,6 @@ class FixedInstagramInteractionService:
                 time.sleep(1)  # Give time for driver to close properly
             
         return result
-
     def _perform_follow_action(self, driver, profile_url):
         """Find and click the follow button on a profile page
         
@@ -685,42 +697,32 @@ class FixedInstagramInteractionService:
             all_results = []
             progress_queue = queue.Queue()
             
-            # Process in parallel using ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                future_to_account = {}
+            # Process accounts sequentially to avoid threading issues
+            completed = 0
+            for username in selected_accounts:
+                try:
+                    self.logger.info(f"Processing account: {username}")
+                    
+                    # Process this account
+                    result = self._follow_with_account(profile_url, username, progress_queue)
+                    all_results.append(result)
+                    
+                    # Update progress if successful
+                    if result['success']:
+                        completed += 1
+                        self.update_progress(completed, num_accounts)
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing account {username}: {str(e)}")
+                    all_results.append({
+                        'username': username,
+                        'target_profile': profile_url,
+                        'success': False,
+                        'error': str(e)
+                    })
                 
-                # Submit tasks for each account
-                for username in selected_accounts:
-                    future = executor.submit(
-                        self._follow_with_account,
-                        profile_url,
-                        username,
-                        progress_queue
-                    )
-                    future_to_account[future] = username
-                
-                # Process results as they complete
-                completed = 0
-                for future in future_to_account:
-                    try:
-                        result = future.result()
-                        all_results.append(result)
-                        
-                        # Update progress
-                        while not progress_queue.empty():
-                            progress_queue.get()
-                            completed += 1
-                            self.update_progress(completed, num_accounts)
-                            
-                    except Exception as e:
-                        username = future_to_account[future]
-                        self.logger.error(f"Error in thread for {username}: {str(e)}")
-                        all_results.append({
-                            'username': username,
-                            'target_profile': profile_url,
-                            'success': False,
-                            'error': str(e)
-                        })
+                # Add a delay between accounts to avoid rate limiting
+                time.sleep(random.uniform(2, 5))
             
             # Calculate success rate
             success_count = len([r for r in all_results if r['success']])
