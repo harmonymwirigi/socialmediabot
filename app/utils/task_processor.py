@@ -232,3 +232,124 @@ def process_follow_task(task_id, profile_url, num_accounts, account_ids=None, us
             
             db.session.commit()
             return {'success': False, 'error': str(e)}
+        
+
+# Add this function to app/utils/task_processor.py
+
+@run_in_background
+def process_like_task(task_id, post_url, num_accounts, account_ids=None, user_id=None):
+    """Process like task in a background thread"""
+    from app.models import BotTask, InstagramAccount
+    from app.services.instagram.account import InstagramAccountService
+    from app.services.instagram.interaction import FixedInstagramInteractionService
+    
+    logger.info(f"Starting like task for post: {post_url}")
+    
+    # Get Flask app context
+    from app import create_app
+    app = create_app()
+    
+    # Use app context for database operations
+    with app.app_context():
+        # Update task status to 'running'
+        task = BotTask.query.get(task_id)
+        if not task:
+            logger.error(f"Task {task_id} not found")
+            return {'success': False, 'error': 'Task not found'}
+        
+        task.status = 'running'
+        task.progress = 0
+        db.session.commit()
+        
+        try:
+            # Get accounts to use
+            account_service = InstagramAccountService()
+            
+            # Determine which accounts to use
+            if account_ids:
+                # Use specific accounts
+                selected_accounts = []
+                for account_id in account_ids:
+                    account = InstagramAccount.query.get(account_id)
+                    if account and account.is_active:
+                        selected_accounts.append(account.username)
+                        
+                # Limit to requested number
+                selected_accounts = selected_accounts[:num_accounts]
+            else:
+                # Use active accounts up to the requested number
+                all_accounts = [username for username, _ in account_service.get_active_accounts()]
+                selected_accounts = all_accounts[:num_accounts]
+            
+            actual_num_accounts = len(selected_accounts)
+            
+            if not selected_accounts:
+                logger.error("No active accounts found")
+                task.status = 'failed'
+                task.error_message = 'No active accounts found'
+                task.completed_at = datetime.datetime.utcnow()
+                
+                db.session.commit()
+                return {'success': False, 'error': 'No active accounts found'}
+            
+            # Setup progress callback
+            def progress_callback(progress):
+                logger.info(f"Like progress: {progress}%")
+                task.progress = int(progress)
+                db.session.commit()
+            
+            # Create interaction service
+            interaction_service = FixedInstagramInteractionService(account_service)
+            interaction_service.set_progress_callback(progress_callback)
+            
+            # Start like operation
+            logger.info(f"Starting like operation with {actual_num_accounts} accounts")
+            results = interaction_service.like_post(post_url, actual_num_accounts)
+            
+            # Calculate stats
+            successful_likes = len([r for r in results if r['success']])
+            success_rate = (successful_likes / actual_num_accounts) * 100 if actual_num_accounts > 0 else 0
+            
+            # Update task status
+            task.status = 'completed'
+            task.progress = 100
+            task.completed_at = datetime.datetime.utcnow()
+            task.result_data = json.dumps(results)
+            task.success_rate = success_rate
+            task.action_count = successful_likes
+            task.account_count = actual_num_accounts
+            
+            db.session.commit()
+            
+            # The account stats are updated in the _like_with_account method
+            # But we'll keep this as a fallback
+            for result in results:
+                if result['success']:
+                    try:
+                        username = result['username']
+                        account = InstagramAccount.query.filter_by(username=username).first()
+                        if account:
+                            account.action_count = account.action_count + 1 if account.action_count else 1
+                            db.session.commit()
+                    except Exception as e:
+                        logger.error(f"Error updating account stats: {str(e)}")
+            
+            logger.info(f"Like task completed. Success rate: {success_rate:.2f}%")
+            return {
+                'success': True,
+                'total_accounts': actual_num_accounts,
+                'successful_likes': successful_likes,
+                'success_rate': success_rate,
+                'results': results
+            }
+            
+        except Exception as e:
+            logger.error(f"Exception during like task: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            task.status = 'failed'
+            task.error_message = str(e)
+            task.completed_at = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            return {'success': False, 'error': str(e)}

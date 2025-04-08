@@ -105,26 +105,68 @@ def cancel_task(task_id):
     
     flash('Task has been cancelled', 'success')
     return redirect(url_for('bot.tasks'))
+
 @bot_bp.route('/like', methods=['GET', 'POST'])
 @login_required
 def like():
-    """Like bot interface"""
+    """Like Instagram posts"""
+    # Get all active accounts for the form
+    accounts = InstagramAccount.query.filter_by(is_active=True).all()
+    
     if request.method == 'POST':
-        post_url = request.form.get('post_url')
-        selected_accounts = request.form.getlist('accounts')
+        # Get form data
+        post_url = request.form.get('post_url', '').strip()
+        hashtag = request.form.get('hashtag', '').strip()
+        post_count = int(request.form.get('post_count', 10))
+        account_ids = request.form.getlist('accounts')
+        min_delay = int(request.form.get('min_delay', 3))
+        max_delay = int(request.form.get('max_delay', 8))
         
-        if not post_url or not selected_accounts:
-            flash('Please fill in all required fields', 'danger')
+        # Validate input
+        if (not post_url and not hashtag) or not account_ids:
+            flash('Please enter a post URL or hashtag and select at least one account', 'danger')
             return redirect(url_for('bot.like'))
         
-        # Create a task for liking
-        flash('Like task created!', 'success')
-        return redirect(url_for('bot.like'))
+        # Create task based on type
+        if post_url:
+            # Clean up URL if needed
+            if not post_url.startswith(('http://', 'https://')):
+                post_url = 'https://www.instagram.com/p/' + post_url.strip('/')
+                if not post_url.endswith('/'):
+                    post_url += '/'
+            
+            # Create task record for liking a single post
+            task = BotTask(
+                user_id=current_user.id,
+                task_type='like_post',
+                status='pending',
+                target_url=post_url,
+                account_count=len(account_ids),
+                action_count=0
+            )
+            db.session.add(task)
+            db.session.commit()
+            
+            # Start background task for liking a post
+            from app.utils.task_processor import process_like_task
+            process_like_task(
+                task_id=task.id,
+                post_url=post_url,
+                num_accounts=len(account_ids),
+                account_ids=account_ids,
+                user_id=current_user.id
+            )
+            
+            flash(f'Like task for post has been started with {len(account_ids)} accounts', 'success')
+            
+        elif hashtag:
+            # TODO: Implement hashtag-based liking in the future
+            flash('Liking by hashtag is not yet implemented', 'warning')
+            return redirect(url_for('bot.like'))
+        
+        return redirect(url_for('main.dashboard'))
     
-    # GET request - show the form
-    accounts = InstagramAccount.query.filter_by(user_id=current_user.id, is_active=True).all()
     return render_template('bot/like.html', accounts=accounts)
-
 
 @bot_bp.route('/follow', methods=['GET', 'POST'])
 @login_required

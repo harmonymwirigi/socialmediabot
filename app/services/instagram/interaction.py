@@ -734,3 +734,439 @@ class FixedInstagramInteractionService:
         except Exception as e:
             self.logger.error(f"Follow operation failed: {str(e)}")
             raise
+    def _like_with_account(self, post_url: str, username: str, progress_queue: queue.Queue) -> dict:
+        """Handle liking a post with a single account
+        
+        Args:
+            post_url: URL of the Instagram post to like
+            username: Instagram username to use for liking
+            progress_queue: Queue for tracking progress
+            
+        Returns:
+            dict: Result information
+        """
+        result = {
+            'username': username,
+            'target_post': post_url,
+            'success': False,
+            'error': None
+        }
+        
+        driver = None
+        
+        try:
+            # Create browser instance
+            self.logger.info(f"Creating browser instance for {username}")
+            
+            # First try using stored cookies
+            self.logger.info(f"Attempting to create session with cookies for {username}")
+            
+            # A flag to track if we need manual intervention
+            manual_login_needed = False
+            
+            try:
+                # Create a direct instance
+                browser = InstagramBrowser()
+                
+                # Check if cookies exist and create a session
+                has_cookies = browser._check_cookies_exist(username)
+                self.logger.info(f"Cookie check result for {username}: {has_cookies}")
+                
+                if has_cookies:
+                    self.logger.info(f"Found cookies for {username}, creating cookie-based session")
+                    driver = browser._create_driver(username=username)
+                    
+                    # Load Instagram post page
+                    driver.get(post_url)
+                    time.sleep(3)
+                    
+                    # Check if session is valid
+                    if "login" in driver.current_url:
+                        self.logger.info(f"Cookie session failed for {username}, manual login required")
+                        manual_login_needed = True
+                    else:
+                        self.logger.info(f"Successfully created cookie-based session for {username}")
+                else:
+                    self.logger.info(f"No cookies found for {username}, manual login required")
+                    manual_login_needed = True
+            except Exception as e:
+                self.logger.error(f"Error with cookie session for {username}: {str(e)}")
+                manual_login_needed = True
+                
+            # If cookies failed or don't exist, initiate manual login
+            if manual_login_needed:
+                if driver:
+                    try:
+                        driver.quit()
+                    except:
+                        pass
+                    driver = None
+                
+                self.logger.info(f"Starting manual login for {username}")
+                
+                # Inform the user they need to manually log in
+                print(f"⚠️ Manual login required for account {username}")
+                print("Please login to the Instagram account when the browser opens")
+                
+                # Create a fresh browser for manual login
+                browser = InstagramBrowser()
+                
+                # Start manual login process
+                manual_login_success = browser.initiate_manual_login(username)
+                
+                if not manual_login_success:
+                    raise Exception(f"Manual login failed or abandoned for {username}")
+                
+                # Create a new session after manual login
+                driver = browser._create_driver(username=username)
+                driver.get(post_url)
+                time.sleep(3)
+            
+            if not driver:
+                raise Exception(f"Failed to create valid session for {username}")
+            
+            self.logger.info(f"Successfully established session for {username}")
+            
+            # Find and click the like button
+            success = self._perform_like_action(driver, post_url)
+            
+            if success:
+                self.logger.info(f"Successfully liked post using {username}")
+                
+                # Use Flask app context for database operations
+                try:
+                    from app import create_app
+                    app = create_app()
+                    with app.app_context():
+                        # Update account last used time
+                        self.account_service.update_last_used(username)
+                        
+                        # Update account action count directly
+                        from app.models import InstagramAccount
+                        account = InstagramAccount.query.filter_by(username=username).first()
+                        if account:
+                            account.action_count = account.action_count + 1 if account.action_count else 1
+                            from app import db
+                            db.session.commit()
+                except Exception as e:
+                    self.logger.error(f"Error updating account stats: {str(e)}")
+                
+                progress_queue.put(1)
+                result['success'] = True
+            else:
+                self.logger.warning(f"Failed to like post using {username}")
+                result['error'] = "Could not find or click like button"
+            
+        except Exception as e:
+            self.logger.error(f"Error while liking with {username}: {str(e)}")
+            result['error'] = str(e)
+            
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+                time.sleep(1)  # Give time for driver to close properly
+            
+        return result
+
+    def _perform_like_action(self, driver, post_url):
+        """Find and click the like button on a post
+        
+        Args:
+            driver: WebDriver instance
+            post_url: URL of the post being liked
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Ensure we're on the post page
+            current_url = driver.current_url
+            if post_url not in current_url:
+                driver.get(post_url)
+                time.sleep(3)
+            
+            # Check if we've already liked this post
+            already_liked_selectors = [
+                "//span[@class='_aamw']//svg[@aria-label='Unlike']",
+                "//span[@class='_aamw']//svg[contains(@aria-label, 'Unlike')]",
+                "//svg[@aria-label='Unlike']",
+                "//span[contains(@aria-label, 'Unlike')]",
+                "//div[@role='button' and @aria-label='Unlike']",
+                "//svg[contains(@aria-label, 'Unlike')]"
+            ]
+            
+            for selector in already_liked_selectors:
+                try:
+                    elements = driver.find_elements(By.XPATH, selector)
+                    if elements and elements[0].is_displayed():
+                        self.logger.info("Already liked this post")
+                        return True
+                except:
+                    continue
+            
+            # Find the like button using the exact structure you provided
+            self.logger.info("Looking for like button with exact structure")
+            
+            # Try using the exact selectors based on the HTML you provided
+            exact_selectors = [
+                "//div[@role='button']//svg[@aria-label='Like']",
+                "//div[contains(@class, 'x1i10hfl')]//svg[@aria-label='Like']",
+                "//div[@role='button' and contains(@class, 'x1i10hfl')]//svg[@aria-label='Like']",
+                "//div[contains(@class, 'x1i10hfl')]//div[contains(@class, 'x6s0dn4')]//svg[@aria-label='Like']"
+            ]
+            
+            like_button = None
+            for selector in exact_selectors:
+                try:
+                    elements = driver.find_elements(By.XPATH, selector)
+                    for element in elements:
+                        if element.is_displayed():
+                            # First try to get the parent button element
+                            try:
+                                parent = element.find_element(By.XPATH, "ancestor::div[@role='button']")
+                                like_button = parent
+                            except:
+                                # If we can't find a parent button, use the SVG itself
+                                like_button = element
+                            break
+                    if like_button:
+                        break
+                except:
+                    continue
+            
+            # If exact structure didn't work, try more general selectors
+            if not like_button:
+                self.logger.info("Trying general selectors for like button")
+                like_selectors = [
+                    "//svg[@aria-label='Like']",
+                    "//span//*[name()='svg' and @aria-label='Like']",
+                    "//*[contains(@aria-label, 'Like') and not(contains(@aria-label, 'Unlike'))]",
+                    "//div[@role='button']//*[name()='svg' and @aria-label='Like']"
+                ]
+                
+                for selector in like_selectors:
+                    try:
+                        elements = driver.find_elements(By.XPATH, selector)
+                        for element in elements:
+                            if element.is_displayed():
+                                # Try to find clickable parent
+                                try:
+                                    parent = element.find_element(By.XPATH, "ancestor::div[@role='button']")
+                                    like_button = parent
+                                except:
+                                    # Use the element itself
+                                    like_button = element
+                                break
+                        if like_button:
+                            break
+                    except:
+                        continue
+            
+            if not like_button:
+                # Try using JavaScript to find and click the like button
+                js_result = driver.execute_script("""
+                    // Find all SVG elements with aria-label "Like"
+                    const likeSvgs = document.querySelectorAll('svg[aria-label="Like"]');
+                    
+                    for (const svg of likeSvgs) {
+                        // Find clickable parent
+                        const button = svg.closest('div[role="button"]') || svg.closest('button') || svg;
+                        
+                        if (button) {
+                            // Scroll to ensure visibility
+                            button.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            setTimeout(() => {
+                                button.click();
+                            }, 500);
+                            return true;
+                        }
+                    }
+                    
+                    return false;
+                """)
+                
+                if js_result:
+                    self.logger.info("Like button clicked via JavaScript")
+                    time.sleep(2)
+                    
+                    # Take a screenshot for debugging
+                    screenshot_path = f"like_debug_{int(time.time())}.png"
+                    driver.save_screenshot(screenshot_path)
+                    self.logger.info(f"Saved screenshot to {screenshot_path}")
+                    
+                    # Since Instagram doesn't consistently update the UI after liking,
+                    # we'll assume success if we got this far and were able to click
+                    self.logger.info("Like action likely successful - continuing with task")
+                    return True
+                
+                # Final attempt - try to find elements by class and structure
+                self.logger.info("Trying to find like button by class structure")
+                
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, "div.x1i10hfl[role='button']")
+                    for element in elements:
+                        try:
+                            svg = element.find_element(By.TAG_NAME, "svg")
+                            aria_label = svg.get_attribute("aria-label")
+                            if aria_label and "Like" in aria_label and "Unlike" not in aria_label:
+                                like_button = element
+                                break
+                        except:
+                            continue
+                except:
+                    pass
+                    
+                if not like_button:
+                    self.logger.warning("Could not find like button")
+                    return False
+            
+            # Try to click the like button
+            self.logger.info("Attempting to click like button")
+            
+            # Scroll to the button to ensure it's in view
+            driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", like_button)
+            time.sleep(1)
+            
+            click_successful = False
+            for _ in range(3):  # Try up to 3 times
+                try:
+                    # Method 1: Regular click
+                    like_button.click()
+                    click_successful = True
+                    break
+                except:
+                    try:
+                        # Method 2: JavaScript click
+                        driver.execute_script("arguments[0].click();", like_button)
+                        click_successful = True
+                        break
+                    except:
+                        try:
+                            # Method 3: ActionChains click
+                            from selenium.webdriver.common.action_chains import ActionChains
+                            actions = ActionChains(driver)
+                            actions.move_to_element(like_button)
+                            actions.click()
+                            actions.perform()
+                            click_successful = True
+                            break
+                        except:
+                            time.sleep(1)  # Wait before retry
+            
+            if click_successful:
+                # Wait to verify like action
+                time.sleep(2)
+                
+                # Take a screenshot for debugging
+                screenshot_path = f"like_debug_{int(time.time())}.png"
+                driver.save_screenshot(screenshot_path)
+                self.logger.info(f"Saved screenshot to {screenshot_path}")
+                
+                # Since Instagram doesn't consistently update the UI after liking,
+                # we'll assume success if we got this far and were able to click
+                self.logger.info("Like action likely successful - continuing with task")
+                return True
+            else:
+                self.logger.warning("Could not click like button with any method")
+                
+                # Final attempt - try a direct JavaScript click using the exact structure
+                js_button_click = driver.execute_script("""
+                    const buttons = document.querySelectorAll('div.x1i10hfl[role="button"]');
+                    
+                    for (const button of buttons) {
+                        const svg = button.querySelector('svg[aria-label="Like"]');
+                        if (svg) {
+                            button.click();
+                            return true;
+                        }
+                    }
+                    
+                    return false;
+                """)
+                
+                if js_button_click:
+                    self.logger.info("Like button clicked via direct JavaScript button selection")
+                    time.sleep(2)
+                    return True
+                    
+                return False
+            
+        except Exception as e:
+            self.logger.error(f"Error performing like action: {str(e)}")
+            return False
+    def like_post(self, post_url, num_accounts=1):
+        """Like a post with multiple accounts
+        
+        Args:
+            post_url: URL of the Instagram post to like
+            num_accounts: Number of accounts to use for liking
+            
+        Returns:
+            list: Results for each like attempt
+        """
+        try:
+            self.logger.info(f"Starting like operation for {post_url} with {num_accounts} accounts")
+            
+            # Get active accounts
+            accounts = self.account_service.get_active_accounts()
+            accounts = [username for username, _ in accounts]
+            
+            # Fallback: if no accounts from service, try direct DB query
+            if not accounts:
+                from app.models import InstagramAccount
+                db_accounts = InstagramAccount.query.filter_by(is_active=True).all()
+                accounts = [account.username for account in db_accounts]
+            
+            if not accounts:
+                raise Exception("No active accounts found")
+            
+            # Limit number of accounts to use
+            num_accounts = min(num_accounts, len(accounts))
+            selected_accounts = accounts[:num_accounts]
+            
+            self.logger.info(f"Using {num_accounts} accounts to like {post_url}")
+            
+            # Setup progress tracking
+            all_results = []
+            progress_queue = queue.Queue()
+            
+            # Process accounts sequentially to avoid threading issues
+            completed = 0
+            for username in selected_accounts:
+                try:
+                    self.logger.info(f"Processing account: {username}")
+                    
+                    # Process this account
+                    result = self._like_with_account(post_url, username, progress_queue)
+                    all_results.append(result)
+                    
+                    # Update progress if successful
+                    if result['success']:
+                        completed += 1
+                        self.update_progress(completed, num_accounts)
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing account {username}: {str(e)}")
+                    all_results.append({
+                        'username': username,
+                        'target_post': post_url,
+                        'success': False,
+                        'error': str(e)
+                    })
+                
+                # Add a delay between accounts to avoid rate limiting
+                time.sleep(random.uniform(2, 5))
+            
+            # Calculate success rate
+            success_count = len([r for r in all_results if r['success']])
+            success_rate = (success_count / num_accounts) * 100 if num_accounts > 0 else 0
+            self.logger.info(f"Like operation completed. Success rate: {success_rate:.2f}%")
+            
+            return all_results
+            
+        except Exception as e:
+            self.logger.error(f"Like operation failed: {str(e)}")
+            raise

@@ -21,6 +21,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('bot.like') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <ul class="nav nav-tabs mb-3" id="likeTab" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="post-tab" data-bs-toggle="tab" data-bs-target="#post" type="button" role="tab" aria-controls="post" aria-selected="true">Like Post</button>
@@ -136,23 +137,50 @@
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
-                    <!-- In a real app, these would be populated from your database -->
-                    <a href="#" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">#travel</h6>
-                            <span class="badge bg-success">Completed</span>
+                    {% if current_user.bot_tasks %}
+                        {% set count = 0 %}
+                        {% for task in current_user.bot_tasks %}
+                            {% if task.task_type == 'like_post' and count < 5 %}
+                                {% set count = count + 1 %}
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ task.target_url.split('/')[-2] if task.target_url else 'Unknown' }}</h6>
+                                        {% if task.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% elif task.status == 'running' %}
+                                        <span class="badge bg-primary">Running</span>
+                                        {% elif task.status == 'failed' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ task.status|title }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="mb-1 small">
+                                        {% if task.status == 'completed' %}
+                                        {{ task.action_count }}/{{ task.account_count }} likes successful
+                                        {% elif task.status == 'running' %}
+                                        {{ task.progress }}% complete
+                                        {% elif task.status == 'failed' %}
+                                        Error: {{ task.error_message|truncate(50) }}
+                                        {% else %}
+                                        Pending...
+                                        {% endif %}
+                                    </p>
+                                    <small class="text-muted">{{ task.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if count == 0 %}
+                            <div class="list-group-item">
+                                <p class="text-muted mb-0">No recent like tasks</p>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="list-group-item">
+                            <p class="text-muted mb-0">No recent like tasks</p>
                         </div>
-                        <p class="mb-1 small">20 posts liked</p>
-                        <small class="text-muted">Today at 11:30 AM</small>
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">@photographer</h6>
-                            <span class="badge bg-primary">Running</span>
-                        </div>
-                        <p class="mb-1 small">5/15 posts liked</p>
-                        <small class="text-muted">Just now</small>
-                    </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -184,6 +212,31 @@
     
     $('#hashtag-tab').on('shown.bs.tab', function (e) {
         $('#post_url').val('');
+    });
+    
+    // Handle URL input format
+    $('#post_url').on('blur', function() {
+        let url = $(this).val().trim();
+        
+        // Handle shorthand format
+        if (url && !url.includes('/') && !url.includes('instagram')) {
+            // If it looks like just a post ID
+            url = 'https://www.instagram.com/p/' + url + '/';
+            $(this).val(url);
+        }
+        // Handle full URL format
+        else if (url && !url.startsWith('http')) {
+            url = 'https://' + url;
+            $(this).val(url);
+        }
+    });
+    
+    // Initialize form
+    $(document).ready(function() {
+        // Select first account by default if none selected
+        if ($('.account-checkbox:checked').length === 0 && $('.account-checkbox').length > 0) {
+            $('.account-checkbox').first().prop('checked', true);
+        }
     });
 </script>
 {% endblock %}
